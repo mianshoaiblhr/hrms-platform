@@ -885,16 +885,7 @@ SELECT 1, id FROM `permissions`;
 INSERT INTO `company_settings` (`company_name`, `company_email`, `currency`, `timezone`) 
 VALUES ('My Company Ltd', 'admin@company.com', 'PKR', 'Asia/Karachi');
 
--- Default Super Admin User (password: Admin@123)
-INSERT INTO `users` (`username`, `email`, `password`, `role_id`, `full_name`, `is_active`)
-VALUES (
-  'admin',
-  'admin@company.com',
-  '$2y$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
-  1,
-  'System Administrator',
-  1
-);
+-- Admin user created by entrypoint via PHP CLI
 
 -- Default Leave Types (Pakistan Standard)
 INSERT INTO `leave_types` (`name`, `code`, `days_per_year`, `carry_forward`, `is_paid`) VALUES

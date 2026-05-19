@@ -105,6 +105,8 @@ function migrate(PDO $db): void
         marital_status TEXT,
         personal_email TEXT,
         personal_phone TEXT,
+        mobile TEXT,
+        official_email TEXT,
         present_address TEXT,
         permanent_address TEXT,
         nationality TEXT DEFAULT 'Pakistani',
@@ -146,6 +148,7 @@ function migrate(PDO $db): void
         carry_forward INTEGER DEFAULT 0,
         is_paid INTEGER DEFAULT 1,
         requires_approval INTEGER DEFAULT 1,
+        color TEXT DEFAULT '#4f46e5',
         created_at TEXT DEFAULT (datetime('now'))
     )");
 

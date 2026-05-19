@@ -127,7 +127,7 @@ class DashboardController extends Controller
             $pendingApprovals = $safeFetch(
                 "SELECT 'Leave' AS type, la.id,
                         (e.first_name || ' ' || e.last_name) AS name,
-                        la.start_date AS date, la.created_at
+                        la.from_date AS date, la.created_at
                  FROM leave_applications la
                  JOIN employees e ON la.employee_id = e.id
                  WHERE la.status = 'pending'

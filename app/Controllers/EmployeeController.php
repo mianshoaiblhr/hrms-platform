@@ -514,7 +514,7 @@ class EmployeeController extends Controller
     {
         return [
             'total'       => $this->db->fetchColumn("SELECT COUNT(*) FROM employees WHERE deleted_at IS NULL AND status = 'active'"),
-            'new_this_month' => $this->db->fetchColumn("SELECT COUNT(*) FROM employees WHERE strftime('%m',joining_date) = strftime('%m','now') AND strftime('%Y',joining_date) = strftime('%Y','now') AND deleted_at IS NULL"),
+            'new_this_month' => $this->db->fetchColumn("SELECT COUNT(*) FROM employees WHERE strftime('%m',join_date) = strftime('%m','now') AND strftime('%Y',join_date) = strftime('%Y','now') AND deleted_at IS NULL"),
             'on_leave'    => $this->db->fetchColumn("SELECT COUNT(DISTINCT employee_id) FROM leave_applications WHERE status = 'approved' AND CURDATE() BETWEEN from_date AND to_date"),
             'departments' => $this->db->fetchColumn("SELECT COUNT(DISTINCT department_id) FROM employees WHERE deleted_at IS NULL AND status = 'active'"),
         ];

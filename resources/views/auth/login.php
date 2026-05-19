@@ -1,7 +1,4 @@
-<?php
-$pageTitle = 'Sign In';
-ob_start();
-?>
+<?php $pageTitle = 'Sign In'; ?>
 
 <form method="POST" action="/login" id="loginForm">
   <?= csrf_field() ?>
@@ -51,7 +48,6 @@ ob_start();
     <i class="fas fa-right-to-bracket"></i>
     Sign In
   </button>
-
 </form>
 
 <script>
@@ -67,7 +63,3 @@ document.getElementById('loginForm').addEventListener('submit',function(){
   b.innerHTML='<i class="fas fa-spinner fa-spin"></i> Signing in...';
 });
 </script>
-
-<?php
-$content = ob_get_clean();
-include __DIR__ . '/../layouts/auth.php';

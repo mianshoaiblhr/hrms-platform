@@ -7,7 +7,8 @@ namespace App\Core;
 
 class Auth
 {
-    private static ?array $currentUser = null;
+    private static ?Auth    $instance    = null;
+    private static ?array   $currentUser = null;
     private Database $db;
 
     private int $maxAttempts;
@@ -22,6 +23,15 @@ class Auth
         $this->lockoutDuration = (int)(getenv('LOCKOUT_DURATION') ?: 900);
         $this->sessionLifetime = (int)(getenv('SESSION_LIFETIME') ?: 120);
         $this->bcryptRounds    = (int)(getenv('BCRYPT_ROUNDS') ?: 12);
+    }
+
+    /** Singleton accessor used by helpers and views */
+    public static function getInstance(): self
+    {
+        if (!self::$instance) {
+            self::$instance = new self();
+        }
+        return self::$instance;
     }
 
     // --------------------------------------------------------

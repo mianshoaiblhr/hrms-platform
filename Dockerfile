@@ -1,6 +1,6 @@
 FROM php:8.2-apache
 
-# Install PHP extensions + mysql client for schema import
+# Install PHP extensions + mysql client
 RUN apt-get update && apt-get install -y \
     libpng-dev libjpeg-dev libwebp-dev libzip-dev \
     libonig-dev libxml2-dev unzip git curl \
@@ -9,12 +9,21 @@ RUN apt-get update && apt-get install -y \
        gd zip opcache exif \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Fix MPM conflict: disable event & worker, keep only prefork
-# php:8.2-apache enables mpm_event by default which conflicts with mpm_prefork
-RUN a2dismod mpm_event mpm_worker 2>/dev/null; \
-    a2enmod mpm_prefork
+# Fix MPM conflict — forcefully delete ALL mpm_* symlinks from mods-enabled,
+# then manually create only the mpm_prefork symlinks.
+# a2dismod is a no-op here because Apache isn't running during build.
+RUN rm -f /etc/apache2/mods-enabled/mpm_event.conf \
+          /etc/apache2/mods-enabled/mpm_event.load \
+          /etc/apache2/mods-enabled/mpm_worker.conf \
+          /etc/apache2/mods-enabled/mpm_worker.load \
+          /etc/apache2/mods-enabled/mpm_prefork.conf \
+          /etc/apache2/mods-enabled/mpm_prefork.load \
+ && ln -s /etc/apache2/mods-available/mpm_prefork.conf \
+          /etc/apache2/mods-enabled/mpm_prefork.conf \
+ && ln -s /etc/apache2/mods-available/mpm_prefork.load \
+          /etc/apache2/mods-enabled/mpm_prefork.load
 
-# Enable required Apache modules
+# Enable required modules
 RUN a2enmod rewrite headers deflate expires
 
 # PHP production settings
@@ -44,7 +53,7 @@ RUN printf '<VirtualHost *:HRMS_PORT>\n\
 WORKDIR /var/www/html
 COPY . .
 
-# Create writable storage directories and set permissions
+# Writable storage directories
 RUN mkdir -p storage/logs storage/uploads/employees \
              storage/uploads/documents storage/uploads/avatars \
              storage/cache storage/backups storage/temp \

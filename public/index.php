@@ -65,22 +65,36 @@ if (file_exists($envFile)) {
 // ==============================================================
 spl_autoload_register(function (string $class): void {
     $prefixes = [
-        'App\\Controllers\\' => APP_PATH . DS . 'Controllers' . DS,
-        'App\\Models\\'      => APP_PATH . DS . 'Models' . DS,
-        'App\\Services\\'    => APP_PATH . DS . 'Services' . DS,
-        'App\\Middleware\\'  => APP_PATH . DS . 'Middleware' . DS,
-        'App\\Core\\'        => APP_PATH . DS . 'Core' . DS,
-        'App\\Helpers\\'     => APP_PATH . DS . 'Helpers' . DS,
+        'App\\Controllers\\' => APP_PATH . DS . 'Controllers',
+        'App\\Models\\'      => APP_PATH . DS . 'Models',
+        'App\\Services\\'    => APP_PATH . DS . 'Services',
+        'App\\Middleware\\'  => APP_PATH . DS . 'Middleware',
+        'App\\Core\\'        => APP_PATH . DS . 'Core',
+        'App\\Helpers\\'     => APP_PATH . DS . 'Helpers',
     ];
 
-    foreach ($prefixes as $prefix => $base) {
+    foreach ($prefixes as $prefix => $baseDir) {
         if (strncmp($prefix, $class, strlen($prefix)) !== 0) continue;
+
+        // 1) Try PSR-4 exact match first (ClassName.php)
         $relative = substr($class, strlen($prefix));
-        $file = $base . str_replace('\\', DS, $relative) . '.php';
+        $file = $baseDir . DS . str_replace('\\', DS, $relative) . '.php';
         if (file_exists($file)) {
-            require $file;
+            require_once $file;
             return;
         }
+
+        // 2) Fallback: scan every .php in the directory and require_once
+        //    until the class is defined (handles multi-class files)
+        foreach (glob($baseDir . DS . '*.php') ?: [] as $phpFile) {
+            if (!class_exists($class, false) && !interface_exists($class, false)) {
+                require_once $phpFile;
+            }
+            if (class_exists($class, false) || interface_exists($class, false)) {
+                return;
+            }
+        }
+        return;
     }
 });
 

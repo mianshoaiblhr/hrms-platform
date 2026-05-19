@@ -26,7 +26,7 @@ echo "==> Starting MariaDB (background)..."
 mkdir -p /var/run/mysqld /var/lib/mysql
 chown -R mysql:mysql /var/run/mysqld /var/lib/mysql 2>/dev/null || true
 [ -d "/var/lib/mysql/mysql" ] || mysql_install_db --datadir=/var/lib/mysql --user=mysql >/dev/null 2>&1
-mysqld_safe --skip-networking=0 --bind-address=127.0.0.1 &
+mysqld_safe --skip-networking=0 --bind-address=127.0.0.1     --innodb-buffer-pool-size=64M     --innodb-log-file-size=32M     --max-connections=50     --skip-name-resolve     --performance-schema=OFF &
 
 # ── Start PHP server IMMEDIATELY so healthcheck passes ────────────────────
 echo "==> PHP server starting on port $PORT"

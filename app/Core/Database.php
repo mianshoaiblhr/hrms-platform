@@ -28,9 +28,9 @@ class Database
         $user = getenv('MYSQLUSER')     ?: getenv('DB_USERNAME') ?: 'hrms';
         $pass = getenv('MYSQLPASSWORD') ?: getenv('DB_PASSWORD') ?: 'hrms_secret';
 
-        // Retry up to 10 times — MariaDB may still be starting
+        // Retry 3 times max, 300ms apart — avoids 10s stall on each request
         $lastErr = '';
-        for ($i = 0; $i < 10; $i++) {
+        for ($i = 0; $i < 3; $i++) {
             try {
                 $this->pdo = new PDO(
                     "mysql:host={$host};port={$port};dbname={$db};charset=utf8mb4",
@@ -45,7 +45,7 @@ class Database
                 return;
             } catch (PDOException $e) {
                 $lastErr = $e->getMessage();
-                sleep(1);
+                usleep(300000); // 300ms
             }
         }
         // Last resort: SQLite
@@ -63,10 +63,11 @@ class Database
             $this->pdo = new PDO(
                 "mysql:host={$host};port={$port};dbname={$db};charset=utf8mb4",
                 $user, $pass,
-                [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                 PDO::ATTR_EMULATE_PREPARES => false,
-                 PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4",
+                [PDO::ATTR_ERRMODE              => PDO::ERRMODE_EXCEPTION,
+                 PDO::ATTR_DEFAULT_FETCH_MODE  => PDO::FETCH_ASSOC,
+                 PDO::ATTR_EMULATE_PREPARES    => false,
+                 PDO::ATTR_TIMEOUT             => 3,
+                 PDO::MYSQL_ATTR_INIT_COMMAND  => 'SET NAMES utf8mb4',
                  PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false]
             );
             self::$driverName = 'mysql';

@@ -36,41 +36,44 @@ EOF
 
 echo "==> .env written"
 
-# Auto-import database schema if DB is accessible and tables don't exist
-echo "==> Checking database..."
-DB_HOST_VAL="${MYSQLHOST:-${DB_HOST:-127.0.0.1}}"
-DB_PORT_VAL="${MYSQLPORT:-${DB_PORT:-3306}}"
-DB_NAME_VAL="${MYSQLDATABASE:-${DB_DATABASE:-hrms_db}}"
-DB_USER_VAL="${MYSQLUSER:-${DB_USERNAME:-root}}"
-DB_PASS_VAL="${MYSQLPASSWORD:-${DB_PASSWORD:-}}"
-
-# Wait for MySQL to be ready (Railway needs a moment)
-echo "==> Waiting for MySQL..."
-for i in $(seq 1 30); do
-  if php -r "new PDO('mysql:host=$DB_HOST_VAL;port=$DB_PORT_VAL;dbname=$DB_NAME_VAL', '$DB_USER_VAL', '$DB_PASS_VAL');" 2>/dev/null; then
-    echo "==> MySQL is ready!"
-    break
-  fi
-  echo "    Attempt $i/30 — waiting 2s..."
-  sleep 2
-done
-
-# Check if tables already exist
-TABLE_COUNT=$(php -r "
-try {
-  \$pdo = new PDO('mysql:host=$DB_HOST_VAL;port=$DB_PORT_VAL;dbname=$DB_NAME_VAL', '$DB_USER_VAL', '$DB_PASS_VAL');
-  echo \$pdo->query('SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=\"$DB_NAME_VAL\"')->fetchColumn();
-} catch(Exception \$e) { echo 0; }
-" 2>/dev/null || echo 0)
-
-if [ "$TABLE_COUNT" -lt "5" ]; then
-  echo "==> Importing database schema..."
-  mysql -h "$DB_HOST_VAL" -P "$DB_PORT_VAL" -u "$DB_USER_VAL" -p"$DB_PASS_VAL" "$DB_NAME_VAL" < /var/www/html/database/schema.sql && \
-    echo "==> ✅ Schema imported successfully!" || \
-    echo "==> ⚠️  Schema import failed — check logs"
-else
-  echo "==> Database already has $TABLE_COUNT tables, skipping import"
-fi
-
+# Start Apache immediately (don't block on DB)
 echo "==> Starting Apache..."
+apache2ctl start 2>/dev/null || true
+
+# Try DB import in background so healthcheck can pass immediately
+(
+  DB_HOST_VAL="${MYSQLHOST:-${DB_HOST:-127.0.0.1}}"
+  DB_PORT_VAL="${MYSQLPORT:-${DB_PORT:-3306}}"
+  DB_NAME_VAL="${MYSQLDATABASE:-${DB_DATABASE:-hrms_db}}"
+  DB_USER_VAL="${MYSQLUSER:-${DB_USERNAME:-root}}"
+  DB_PASS_VAL="${MYSQLPASSWORD:-${DB_PASSWORD:-}}"
+
+  echo "==> [background] Waiting for MySQL at $DB_HOST_VAL:$DB_PORT_VAL..."
+  for i in $(seq 1 40); do
+    if php -r "new PDO('mysql:host=$DB_HOST_VAL;port=$DB_PORT_VAL;dbname=$DB_NAME_VAL', '$DB_USER_VAL', '$DB_PASS_VAL');" 2>/dev/null; then
+      echo "==> [background] MySQL is ready!"
+      break
+    fi
+    echo "    Attempt $i/40 — waiting 3s..."
+    sleep 3
+  done
+
+  TABLE_COUNT=$(php -r "
+  try {
+    \$pdo = new PDO('mysql:host=$DB_HOST_VAL;port=$DB_PORT_VAL;dbname=$DB_NAME_VAL', '$DB_USER_VAL', '$DB_PASS_VAL');
+    echo \$pdo->query('SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=\"$DB_NAME_VAL\"')->fetchColumn();
+  } catch(Exception \$e) { echo 0; }
+  " 2>/dev/null || echo 0)
+
+  if [ "$TABLE_COUNT" -lt "5" ]; then
+    echo "==> [background] Importing database schema..."
+    mysql -h "$DB_HOST_VAL" -P "$DB_PORT_VAL" -u "$DB_USER_VAL" -p"$DB_PASS_VAL" "$DB_NAME_VAL" < /var/www/html/database/schema.sql && \
+      echo "==> [background] ✅ Schema imported!" || \
+      echo "==> [background] ⚠️  Schema import failed"
+  else
+    echo "==> [background] DB already has $TABLE_COUNT tables, skipping"
+  fi
+) &
+
+# Keep Apache in foreground
 exec apache2-foreground

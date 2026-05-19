@@ -74,7 +74,7 @@ class DashboardController extends Controller
         // ── Recent leave applications ──────────────────────────────────────
         $recentLeaves = $safeFetch(
             "SELECT la.*, lt.name AS leave_type,
-                    (e.first_name || ' ' || e.last_name) AS employee_name
+                    (CONCAT(e.first_name,' ',e.last_name)) AS employee_name
              FROM leave_applications la
              JOIN employees e  ON la.employee_id   = e.id
              JOIN leave_types lt ON la.leave_type_id = lt.id
@@ -126,7 +126,7 @@ class DashboardController extends Controller
         if (Auth::getInstance()->can('leaves.approve')) {
             $pendingApprovals = $safeFetch(
                 "SELECT 'Leave' AS type, la.id,
-                        (e.first_name || ' ' || e.last_name) AS name,
+                        (CONCAT(e.first_name,' ',e.last_name)) AS name,
                         la.from_date AS date, la.created_at
                  FROM leave_applications la
                  JOIN employees e ON la.employee_id = e.id
@@ -180,7 +180,7 @@ class DashboardController extends Controller
             $like = '%' . $q . '%';
             try {
                 $employees = $this->db->fetchAll(
-                    "SELECT id, (first_name || ' ' || last_name) AS name, employee_code AS code, 'Employee' AS type
+                    "SELECT id, (CONCAT(first_name,' ',last_name)) AS name, employee_code AS code, 'Employee' AS type
                      FROM employees
                      WHERE (first_name LIKE ? OR last_name LIKE ? OR employee_code LIKE ?)
                        AND deleted_at IS NULL LIMIT 5",

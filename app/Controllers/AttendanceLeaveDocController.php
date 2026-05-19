@@ -31,7 +31,7 @@ class AttendanceController extends Controller
         $model   = new \App\Models\Attendance();
         $data    = $model->listWithEmployee($filters, $page);
         $departments = $this->db->fetchAll("SELECT id,name FROM departments WHERE status='active' AND deleted_at IS NULL ORDER BY name");
-        $employees   = $this->db->fetchAll("SELECT id,(first_name || ' ' || last_name) AS name FROM employees WHERE status='active' AND deleted_at IS NULL ORDER BY first_name");
+        $employees   = $this->db->fetchAll("SELECT id,(CONCAT(first_name,' ',last_name)) AS name FROM employees WHERE status='active' AND deleted_at IS NULL ORDER BY first_name");
         $this->view('attendance/index', compact('data','filters','departments','employees'));
     }
 
@@ -100,7 +100,7 @@ class AttendanceController extends Controller
         $from = $this->input('from', date('Y-m-01'));
         $to   = $this->input('to', date('Y-m-d'));
         $rows = $this->db->fetchAll(
-            "SELECT e.employee_code, (e.first_name || ' ' || e.last_name) AS name,
+            "SELECT e.employee_code, (CONCAT(e.first_name,' ',e.last_name)) AS name,
                     d.name AS dept, a.attendance_date, a.check_in, a.check_out,
                     a.status, a.working_hours, a.late_minutes, a.overtime_minutes
              FROM attendance a JOIN employees e ON a.employee_id=e.id
@@ -177,7 +177,7 @@ class LeaveController extends Controller
         $leaveTypes  = $this->db->fetchAll("SELECT * FROM leave_types WHERE status='active' ORDER BY name");
         $departments = $this->db->fetchAll("SELECT id,name FROM departments WHERE status='active' AND deleted_at IS NULL ORDER BY name");
         $employees   = Auth::getInstance()->can('leaves.view_all')
-            ? $this->db->fetchAll("SELECT id,(first_name || ' ' || last_name) AS name FROM employees WHERE status='active' AND deleted_at IS NULL ORDER BY first_name")
+            ? $this->db->fetchAll("SELECT id,(CONCAT(first_name,' ',last_name)) AS name FROM employees WHERE status='active' AND deleted_at IS NULL ORDER BY first_name")
             : [];
         $this->view('leaves/index', compact('data','filters','leaveTypes','departments','employees'));
     }
@@ -327,7 +327,7 @@ class LeaveController extends Controller
                   LEFT JOIN departments d ON e.department_id=d.id
                   WHERE lb.year=? AND e.deleted_at IS NULL" . ($dept ? " AND e.department_id=$dept" : '');
         $balances = $this->db->paginate(
-            "SELECT lb.*, e.employee_code, (e.first_name || ' ' || e.last_name) AS employee_name,
+            "SELECT lb.*, e.employee_code, (CONCAT(e.first_name,' ',e.last_name)) AS employee_name,
                     lt.name AS leave_type, lt.color, d.name AS dept_name $baseQ ORDER BY e.first_name, lt.name",
             "SELECT COUNT(*) $baseQ", [$year], (int)$this->input('page', 1)
         );
@@ -343,7 +343,7 @@ class LeaveController extends Controller
         $empFilter = Auth::getInstance()->can('leaves.view_all') ? '' : " AND la.employee_id=" . (int)$user['employee_id'];
         $leaves = $this->db->fetchAll(
             "SELECT la.from_date, la.to_date, la.status, lt.name AS leave_type, lt.color,
-                    (e.first_name || ' ' || e.last_name) AS employee_name
+                    (CONCAT(e.first_name,' ',e.last_name)) AS employee_name
              FROM leave_applications la
              JOIN employees e ON la.employee_id=e.id
              JOIN leave_types lt ON la.leave_type_id=lt.id
@@ -400,7 +400,7 @@ class DocumentController extends Controller
 
         $base = "FROM documents d LEFT JOIN document_categories dc ON d.category_id=dc.id LEFT JOIN employees e ON d.employee_id=e.id WHERE " . implode(' AND ', $where);
         $documents = $this->db->paginate(
-            "SELECT d.*, dc.name AS category_name, (e.first_name || ' ' || e.last_name) AS employee_name $base ORDER BY d.created_at DESC",
+            "SELECT d.*, dc.name AS category_name, (CONCAT(e.first_name,' ',e.last_name)) AS employee_name $base ORDER BY d.created_at DESC",
             "SELECT COUNT(*) $base", $params, (int)$this->input('page', 1)
         );
         $categories = $this->db->fetchAll("SELECT * FROM document_categories WHERE deleted_at IS NULL ORDER BY name");

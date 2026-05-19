@@ -28,7 +28,7 @@ class UserController extends Controller
     {
         $this->requirePermission('users.create');
         $roles     = $this->db->fetchAll("SELECT * FROM roles WHERE status='active' ORDER BY name");
-        $employees = $this->db->fetchAll("SELECT e.id, (e.first_name||' '||e.last_name||' ('||e.employee_code||')') AS name FROM employees e LEFT JOIN users u ON e.id=u.employee_id WHERE u.id IS NULL AND e.deleted_at IS NULL ORDER BY e.first_name");
+        $employees = $this->db->fetchAll("SELECT e.id, (CONCAT(e.first_name,' ',e.last_name)||' ('||e.employee_code||')') AS name FROM employees e LEFT JOIN users u ON e.id=u.employee_id WHERE u.id IS NULL AND e.deleted_at IS NULL ORDER BY e.first_name");
         $this->view('settings/user_form', compact('roles','employees'));
     }
 
@@ -320,14 +320,14 @@ class ReportController extends Controller
         $where = "pp.start_date >= ? AND pp.end_date <= ?";
         if ($dept) { $where .= " AND e.department_id = ?"; $params[] = $dept; }
         $data = $this->db->fetchAll(
-            "SELECT e.employee_code, (e.first_name||' '||e.last_name) AS name,
-                    d.name AS dept, pp.period_name,
+            "SELECT e.employee_code, (CONCAT(e.first_name,' ',e.last_name)) AS name,
+                    d.name AS dept, pp.name AS period_name,
                     pi.gross_salary, pi.total_deductions, pi.net_salary, pi.status
              FROM payroll_items pi
              JOIN employees e ON pi.employee_id=e.id
              JOIN payroll_periods pp ON pi.payroll_period_id=pp.id
              LEFT JOIN departments d ON e.department_id=d.id
-             WHERE $where AND pi.deleted_at IS NULL ORDER BY e.first_name",
+             WHERE $where ORDER BY e.first_name",
             $params
         );
         if ($this->input('export') === 'csv') {
@@ -347,7 +347,7 @@ class ReportController extends Controller
         $params = [$from, $to];
         $deptCond = $dept ? " AND e.department_id = $dept" : '';
         $data = $this->db->fetchAll(
-            "SELECT e.employee_code, (e.first_name||' '||e.last_name) AS name,
+            "SELECT e.employee_code, (CONCAT(e.first_name,' ',e.last_name)) AS name,
                     d.name AS dept,
                     SUM(a.status='present') AS present,
                     SUM(a.status='absent') AS absent,
@@ -373,14 +373,14 @@ class ReportController extends Controller
         $this->requirePermission('reports.tax');
         $year = (int)$this->input('year', date('Y'));
         $data = $this->db->fetchAll(
-            "SELECT e.employee_code, (e.first_name||' '||e.last_name) AS name, e.cnic, e.ntn_number,
+            "SELECT e.employee_code, (CONCAT(e.first_name,' ',e.last_name)) AS name, e.cnic, e.ntn,
                     COALESCE(SUM(pid.amount),0) AS total_income_tax
              FROM employees e
              JOIN payroll_items pi ON pi.employee_id=e.id
              JOIN payroll_item_details pid ON pid.payroll_item_id=pi.id
              JOIN salary_components sc ON pid.component_id=sc.id
              WHERE sc.type='deduction' AND sc.name='Income Tax' AND strftime('%Y',pi.created_at)=?
-             AND pi.deleted_at IS NULL AND e.deleted_at IS NULL
+             AND e.deleted_at IS NULL
              GROUP BY e.id ORDER BY e.first_name",
             [$year]
         );
@@ -397,7 +397,7 @@ class ReportController extends Controller
         $from = $this->input('from', date('Y-m-01'));
         $to   = $this->input('to', date('Y-m-d'));
         $data = $this->db->fetchAll(
-            "SELECT e.employee_code, (e.first_name||' '||e.last_name) AS name,
+            "SELECT e.employee_code, (CONCAT(e.first_name,' ',e.last_name)) AS name,
                     e.cnic, e.eobi_number, e.date_of_birth,
                     COALESCE(SUM(CASE WHEN sc.name='EOBI Employee' THEN pid.amount ELSE 0 END),0) AS employee_contribution,
                     COALESCE(SUM(CASE WHEN sc.name='EOBI Employer' THEN pid.amount ELSE 0 END),0) AS employer_contribution
@@ -405,7 +405,7 @@ class ReportController extends Controller
              JOIN payroll_items pi ON pi.employee_id=e.id
              JOIN payroll_item_details pid ON pid.payroll_item_id=pi.id
              JOIN salary_components sc ON pid.component_id=sc.id
-             WHERE pi.created_at BETWEEN ? AND ? AND pi.deleted_at IS NULL AND e.deleted_at IS NULL
+             WHERE pi.created_at BETWEEN ? AND ? AND e.deleted_at IS NULL
              GROUP BY e.id ORDER BY e.first_name",
             [$from, $to]
         );
@@ -464,7 +464,7 @@ class AuditController extends Controller
         $whereStr = implode(' AND ', $where);
         $base = "FROM audit_logs al LEFT JOIN users u ON al.user_id=u.id LEFT JOIN employees e ON u.employee_id=e.id WHERE $whereStr";
         $logs = $this->db->paginate(
-            "SELECT al.*, u.username, (e.first_name||' '||e.last_name) AS full_name $base ORDER BY al.created_at DESC",
+            "SELECT al.*, u.username, (CONCAT(e.first_name,' ',e.last_name)) AS full_name $base ORDER BY al.created_at DESC",
             "SELECT COUNT(*) $base", $params, (int)$this->input('page',1)
         );
         $users = $this->db->fetchAll("SELECT u.id, u.username FROM users u WHERE u.deleted_at IS NULL ORDER BY u.username");

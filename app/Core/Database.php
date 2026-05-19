@@ -12,29 +12,45 @@ class Database
 
     private function __construct()
     {
-        // Try MySQL first (Railway external OR local bundled MariaDB)
-        $host = getenv('MYSQLHOST') ?: getenv('DB_HOST') ?: '127.0.0.1';
-        $port = getenv('MYSQLPORT') ?: getenv('DB_PORT') ?: '3306';
+        // Load .env if not already loaded
+        $envFile = (defined('ROOT_PATH') ? ROOT_PATH : '/var/www/html') . '/.env';
+        if (file_exists($envFile)) {
+            foreach (file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+                if (strpos(trim($line), '#') === 0 || !strpos($line, '=')) continue;
+                [$k, $v] = explode('=', $line, 2);
+                if (!getenv(trim($k))) putenv(trim($k) . '=' . trim($v));
+            }
+        }
+
+        $host = getenv('MYSQLHOST')     ?: getenv('DB_HOST')     ?: '127.0.0.1';
+        $port = getenv('MYSQLPORT')     ?: getenv('DB_PORT')     ?: '3306';
         $db   = getenv('MYSQLDATABASE') ?: getenv('DB_DATABASE') ?: 'hrms_db';
         $user = getenv('MYSQLUSER')     ?: getenv('DB_USERNAME') ?: 'hrms';
         $pass = getenv('MYSQLPASSWORD') ?: getenv('DB_PASSWORD') ?: 'hrms_secret';
 
-        try {
-            $this->pdo = new PDO(
-                "mysql:host={$host};port={$port};dbname={$db};charset=utf8mb4",
-                $user, $pass,
-                [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                 PDO::ATTR_EMULATE_PREPARES => false,
-                 PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4",
-                 PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false]
-            );
-            self::$driverName = 'mysql';
-        } catch (PDOException $e) {
-            // MySQL not ready yet — fall back to SQLite for graceful startup
-            error_log("MySQL not ready ({$e->getMessage()}), using SQLite");
-            $this->connectSQLite();
+        // Retry up to 10 times — MariaDB may still be starting
+        $lastErr = '';
+        for ($i = 0; $i < 10; $i++) {
+            try {
+                $this->pdo = new PDO(
+                    "mysql:host={$host};port={$port};dbname={$db};charset=utf8mb4",
+                    $user, $pass,
+                    [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                     PDO::ATTR_EMULATE_PREPARES => false,
+                     PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4",
+                     PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false]
+                );
+                self::$driverName = 'mysql';
+                return;
+            } catch (PDOException $e) {
+                $lastErr = $e->getMessage();
+                sleep(1);
+            }
         }
+        // Last resort: SQLite
+        error_log("MySQL unavailable after retries ({$lastErr}), using SQLite");
+        $this->connectSQLite();
     }
 
     private function connectMySQL(string $host): void

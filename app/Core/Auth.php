@@ -212,13 +212,6 @@ class Auth
             return false;
         }
 
-        // IP change detection
-        if (Session::get('ip_address') !== $this->getClientIP()) {
-            AuditLogger::log('security_alert', 'auth', Session::get('user_id'), null, 'IP changed during session');
-            $this->logout();
-            return false;
-        }
-
         // Update last activity
         Session::set('last_activity', time());
         $this->db->update('users', ['last_seen_at' => date('Y-m-d H:i:s')], 'id = ?', [Session::get('user_id')]);
@@ -288,7 +281,9 @@ class Auth
 
     public function isSuperAdmin(): bool
     {
-        return $this->roleSlug() === 'super_admin';
+        if ($this->roleSlug() === 'super_admin') return true;
+        $u = $this->user();
+        return !empty($u['is_super_admin']);
     }
 
     // --------------------------------------------------------

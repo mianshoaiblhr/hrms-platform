@@ -139,7 +139,9 @@ class Router
     private function pathToPattern(string $path): string
     {
         $pattern = preg_replace('/\{([a-zA-Z_]+)\}/', '(?P<$1>[^/]+)', $path);
-        return '#^' . $pattern . '$#';
+        // Strip trailing slash then make it optional — /employees and /employees/ both match
+        $pattern = rtrim($pattern, '/');
+        return '#^' . $pattern . '/?$#';
     }
 
     private function extractParams(array $matches): array

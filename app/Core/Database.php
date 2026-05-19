@@ -12,10 +12,27 @@ class Database
 
     private function __construct()
     {
-        $host = getenv('MYSQLHOST')     ?: getenv('DB_HOST')     ?: '';
-        if ($host && $host !== '127.0.0.1' && $host !== 'localhost') {
-            $this->connectMySQL($host);
-        } else {
+        // Try MySQL first (Railway external OR local bundled MariaDB)
+        $host = getenv('MYSQLHOST') ?: getenv('DB_HOST') ?: '127.0.0.1';
+        $port = getenv('MYSQLPORT') ?: getenv('DB_PORT') ?: '3306';
+        $db   = getenv('MYSQLDATABASE') ?: getenv('DB_DATABASE') ?: 'hrms_db';
+        $user = getenv('MYSQLUSER')     ?: getenv('DB_USERNAME') ?: 'hrms';
+        $pass = getenv('MYSQLPASSWORD') ?: getenv('DB_PASSWORD') ?: 'hrms_secret';
+
+        try {
+            $this->pdo = new PDO(
+                "mysql:host={$host};port={$port};dbname={$db};charset=utf8mb4",
+                $user, $pass,
+                [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                 PDO::ATTR_EMULATE_PREPARES => false,
+                 PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4",
+                 PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false]
+            );
+            self::$driverName = 'mysql';
+        } catch (PDOException $e) {
+            // MySQL not ready yet — fall back to SQLite for graceful startup
+            error_log("MySQL not ready ({$e->getMessage()}), using SQLite");
             $this->connectSQLite();
         }
     }

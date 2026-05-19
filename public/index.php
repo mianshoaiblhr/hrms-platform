@@ -26,7 +26,7 @@ define('UPLOAD_PATH', STORAGE_PATH . DS . 'uploads');
 // ERROR HANDLING
 // ==============================================================
 error_reporting(E_ALL);
-ini_set('display_errors', '0');
+ini_set('display_errors', '1');
 ini_set('log_errors', '1');
 ini_set('error_log', STORAGE_PATH . DS . 'logs' . DS . 'php_error.log');
 
@@ -126,22 +126,13 @@ require ROOT_PATH . DS . 'routes' . DS . 'web.php';
 try {
     $router->dispatch();
 } catch (\Throwable $e) {
-    // Log the error
-    $logFile = STORAGE_PATH . DS . 'logs' . DS . 'app_error.log';
-    $logMsg = date('[Y-m-d H:i:s]') . ' ' . $e->getMessage()
-        . ' in ' . $e->getFile() . ':' . $e->getLine() . PHP_EOL
-        . $e->getTraceAsString() . PHP_EOL . PHP_EOL;
-    @file_put_contents($logFile, $logMsg, FILE_APPEND | LOCK_EX);
-
-    // Show appropriate error page
     http_response_code(500);
-    $errView = RESOURCE_PATH . DS . 'views' . DS . 'errors' . DS . '500.php';
-    if (file_exists($errView)) {
-        include $errView;
-    } else {
-        echo '<h1>500 - Internal Server Error</h1>';
-        if (($_ENV['APP_DEBUG'] ?? 'false') === 'true') {
-            echo '<pre>' . htmlspecialchars($e->getMessage()) . '</pre>';
-        }
-    }
+    echo '<html><body style="font-family:monospace;padding:2rem;background:#1a1a2e;color:#eee">';
+    echo '<h2 style="color:#e94560">&#9888; HRMS Error (debug mode)</h2>';
+    echo '<p style="color:#f5a623;font-size:1.1em">' . htmlspecialchars($e->getMessage()) . '</p>';
+    echo '<p style="color:#aaa">' . htmlspecialchars($e->getFile()) . ' : line ' . $e->getLine() . '</p>';
+    echo '<pre style="background:#0f0f23;padding:1rem;overflow:auto;font-size:0.8em;color:#7ec8e3">'
+        . htmlspecialchars($e->getTraceAsString()) . '</pre>';
+    echo '<p style="color:#555;font-size:0.75em">Remove debug output once issue is resolved.</p>';
+    echo '</body></html>';
 }

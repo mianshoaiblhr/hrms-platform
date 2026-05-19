@@ -18,10 +18,10 @@ class Session
 
         // Secure session configuration
         ini_set('session.cookie_httponly', '1');
-        ini_set('session.cookie_secure',   getenv('SESSION_SECURE') === 'true' ? '1' : '0');
-        ini_set('session.cookie_samesite', 'Strict');
+        ini_set('session.cookie_secure',   '0');
+        ini_set('session.cookie_samesite', 'Lax');
         ini_set('session.use_strict_mode', '1');
-        ini_set('session.gc_maxlifetime',  (string)((int)(getenv('SESSION_LIFETIME') ?: 120) * 60));
+        ini_set('session.gc_maxlifetime',  '86400');
         ini_set('session.use_trans_sid',   '0');
 
         session_name('HRMS_SESSION');

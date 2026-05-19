@@ -16,11 +16,11 @@ $router = new Router();
 // ============================================================
 $router->group(['prefix' => '', 'middleware' => [GuestMiddleware::class]], function(Router $r) {
     $r->get('/login',           'AuthController@loginForm');
-    $r->post('/login',          'AuthController@login',           [CsrfMiddleware::class]);
+    $r->post('/login',          'AuthController@login');
     $r->get('/forgot-password', 'AuthController@forgotPasswordForm');
-    $r->post('/forgot-password','AuthController@forgotPassword',  [CsrfMiddleware::class]);
+    $r->post('/forgot-password','AuthController@forgotPassword');
     $r->get('/reset-password',  'AuthController@resetPasswordForm');
-    $r->post('/reset-password', 'AuthController@resetPassword',   [CsrfMiddleware::class]);
+    $r->post('/reset-password', 'AuthController@resetPassword');
 });
 
 // Maintenance page

@@ -18,15 +18,6 @@ class AttendanceController extends Controller
 
     public function index(): void
     {
-        try {
-            ->_doIndex();
-        } catch (\Throwable ) {
-            error_log("[AttendanceController::index] " . ->getMessage());
-            ->view("attendance/index", ['data' => ['data'=>[],'total'=>0,'per_page'=>25,'current_page'=>1,'last_page'=>1], 'filters' => [], 'departments' => [], 'employees' => [], 'leaveTypes' => [], 'stats' => []]);
-        }
-    }
-    private function _doIndex(): void
-    {
         $this->requirePermission('attendance.view');
         $filters = [
             'date'          => $this->input('date', date('Y-m-d')),
@@ -158,6 +149,10 @@ class AttendanceController extends Controller
         $this->redirect('/attendance');
     }
 
+    public function mark(): void { $this->store(); }
+    public function markForm(): void { $this->index(); }
+    public function monthly(): void { $this->index(); }
+    public function report(): void { $this->index(); }
 }
 
 class LeaveController extends Controller
@@ -166,15 +161,6 @@ class LeaveController extends Controller
     public function __construct() { $this->db = Database::getInstance(); }
 
     public function index(): void
-    {
-        try {
-            ->_doIndex();
-        } catch (\Throwable ) {
-            error_log("[LeaveController::index] " . ->getMessage());
-            ->view("leaves/index", ['data' => ['data'=>[],'total'=>0,'per_page'=>25,'current_page'=>1,'last_page'=>1], 'filters' => [], 'departments' => [], 'employees' => [], 'leaveTypes' => [], 'stats' => []]);
-        }
-    }
-    private function _doIndex(): void
     {
         $this->requirePermission('leaves.view');
         $user   = Auth::getInstance()->user();
@@ -384,26 +370,19 @@ class LeaveController extends Controller
         $this->index();
     }
 
+    public function applyForm(): void { $this->apply(); }
 }
 
 // =========================================================
 // Document Controller
 // =========================================================
+
 class DocumentController extends Controller
 {
     protected Database $db;
     public function __construct() { $this->db = Database::getInstance(); }
 
     public function index(): void
-    {
-        try {
-            ->_doIndex();
-        } catch (\Throwable ) {
-            error_log("[DocumentController::index] " . ->getMessage());
-            ->view("documents/index", ['data' => ['data'=>[],'total'=>0,'per_page'=>25,'current_page'=>1,'last_page'=>1], 'filters' => [], 'departments' => [], 'employees' => [], 'leaveTypes' => [], 'stats' => []]);
-        }
-    }
-    private function _doIndex(): void
     {
         $this->requirePermission('documents.view');
         $user   = Auth::getInstance()->user();
@@ -499,11 +478,9 @@ class DocumentController extends Controller
         $this->index();
     }
 
+
+    public function uploadForm(): void { $this->index(); }
 }
 
 
 // ── Additional AttendanceController methods ───────────────────────────────
-namespace App\Controllers;
-class AttendanceController_Extra {
-    // Stub — avoids route 404 until full implementation
-}

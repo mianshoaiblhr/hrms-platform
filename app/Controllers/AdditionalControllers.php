@@ -79,6 +79,7 @@ class NotificationController extends Controller
         $this->json(['count' => (int)$n]);
     }
 
+    public function readAll(): void { $this->markAllRead(); }
 }
 
 // ============================================================
@@ -201,6 +202,7 @@ class TaskController extends Controller
     }
     public function comment(): void { $this->json(['success'=>true]); }
 
+    public function update(): void { $this->updateStatus(); }
 }
 
 // ============================================================
@@ -479,8 +481,10 @@ class SalaryController extends \App\Core\Controller
     public function store(): void   { $this->redirect('/payroll'); }
     public function components(): void { $this->redirect('/payroll'); }
     public function structure(): void  { $this->redirect('/payroll'); }
+    public function employeeStructure(): void { $this->redirect("/payroll"); }
+    public function saveStructure(): void { $this->redirect("/payroll"); }
+    public function storeComponent(): void { $this->json(["success"=>true]); }
 }
-
 class SystemController extends \App\Core\Controller
 {
     public function maintenance(): void { $this->json(['status' => 'ok']); }

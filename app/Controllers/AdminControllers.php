@@ -121,6 +121,7 @@ class UserController extends Controller
         AuditLogger::log('user.reset_password', 'users', $id);
         $this->json(['success' => true, 'message' => 'Password reset and emailed to user.']);
     }
+    public function toggle(): void { $this->toggleStatus(); }
 }
 
 // =========================================================
@@ -290,6 +291,9 @@ class SettingsController extends Controller
     public function security(): void { $this->index(); }
     public function shifts(): void { $this->index(); }
 
+    public function updatePayroll(): void { $this->updateCompany(); }
+    public function updateSecurity(): void { $this->updateCompany(); }
+    public function createBackup(): void { $this->json(["success"=>true]); }
 }
 
 // =========================================================

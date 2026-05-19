@@ -18,11 +18,6 @@ ALTER TABLE leave_balances ADD COLUMN IF NOT EXISTS `used` INT AS (used_days) VI
 -- ── leave_types ───────────────────────────────────────────────────────────
 ALTER TABLE leave_types ADD COLUMN IF NOT EXISTS max_days INT AS (days_per_year) VIRTUAL;
 ALTER TABLE leave_types ADD COLUMN IF NOT EXISTS color VARCHAR(20) AS (color_code) VIRTUAL;
-ALTER TABLE leave_types ADD COLUMN IF NOT EXISTS carry_forward TINYINT(1) AS (
-    CASE WHEN carry_forward_days > 0 THEN 1 ELSE 0 END
-) VIRTUAL;
-ALTER TABLE leave_types ADD COLUMN IF NOT EXISTS is_paid TINYINT(1) DEFAULT 1;
-UPDATE leave_types SET is_paid = 1 WHERE is_paid IS NULL;
 
 -- ── leave_applications ────────────────────────────────────────────────────
 ALTER TABLE leave_applications ADD COLUMN IF NOT EXISTS days INT AS (days_requested) VIRTUAL;

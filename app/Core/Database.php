@@ -179,14 +179,20 @@ class Database
         return (int) $this->pdo->lastInsertId();
     }
 
-    public function update(string $table, array $data, array $where): int
+    public function update(string $table, array $data, array|string $where, array $whereParams = []): int
     {
-        $set  = implode(', ', array_map(fn($k) => "{$k} = ?", array_keys($data)));
-        $cond = implode(' AND ', array_map(fn($k) => "{$k} = ?", array_keys($where)));
-        $stmt = $this->query(
-            "UPDATE {$table} SET {$set} WHERE {$cond}",
-            [...array_values($data), ...array_values($where)]
-        );
+        $set = implode(', ', array_map(fn($k) => "{$k} = ?", array_keys($data)));
+
+        if (is_array($where)) {
+            $cond       = implode(' AND ', array_map(fn($k) => "{$k} = ?", array_keys($where)));
+            $bindParams = [...array_values($data), ...array_values($where)];
+        } else {
+            // String WHERE clause: update('users', $data, 'id = ?', [$id])
+            $cond       = $where;
+            $bindParams = [...array_values($data), ...$whereParams];
+        }
+
+        $stmt = $this->query("UPDATE {$table} SET {$set} WHERE {$cond}", $bindParams);
         return $stmt->rowCount();
     }
 

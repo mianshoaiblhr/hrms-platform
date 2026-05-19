@@ -52,7 +52,7 @@ if (!function_exists('url')) {
 
 if (!function_exists('asset')) {
     function asset(string $path): string {
-        return url('assets/' . ltrim($path, '/'));
+        return '/assets/' . ltrim($path, '/');
     }
 }
 

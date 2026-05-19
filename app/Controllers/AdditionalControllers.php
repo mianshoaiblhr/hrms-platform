@@ -233,7 +233,7 @@ class AdvanceController extends Controller
 
         $page = (int)($_GET['page'] ?? 1);
         $data = $db->paginate(
-            "SELECT a.*, CONCAT(e.first_name,' ',e.last_name) AS employee_name, e.employee_code
+            "SELECT a.*, (e.first_name || ' ' || e.last_name) AS employee_name, e.employee_code
              FROM salary_advances a
              JOIN employees e ON a.employee_id = e.id
              WHERE " . implode(' AND ', $where) . " ORDER BY a.created_at DESC",
@@ -342,7 +342,7 @@ class LoanController extends Controller
 
         $page = (int)($_GET['page'] ?? 1);
         $data = $db->paginate(
-            "SELECT l.*, CONCAT(e.first_name,' ',e.last_name) AS employee_name
+            "SELECT l.*, (e.first_name || ' ' || e.last_name) AS employee_name
              FROM employee_loans l
              JOIN employees e ON l.employee_id = e.id
              WHERE " . implode(' AND ', $where) . " ORDER BY l.created_at DESC",
@@ -444,7 +444,7 @@ class SearchController extends Controller
         // Employees
         if (Auth::can('employees.view')) {
             $emps = $db->fetchAll(
-                "SELECT id, employee_code, CONCAT(first_name,' ',last_name) AS name FROM employees
+                "SELECT id, employee_code, (first_name || ' ' || last_name) AS name FROM employees
                  WHERE (first_name LIKE ? OR last_name LIKE ? OR employee_code LIKE ? OR cnic LIKE ?)
                    AND deleted_at IS NULL LIMIT 5",
                 [$like, $like, $like, $like]

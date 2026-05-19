@@ -238,3 +238,16 @@ class AuditLogger
         return '0.0.0.0';
     }
 }
+
+// Safe DB query helper available to all controllers
+trait SafeQuery
+{
+    protected function safeQuery(callable $fn, mixed $fallback = null): mixed
+    {
+        try { return $fn(); }
+        catch (\Throwable $e) {
+            error_log('[ORBIT] Query failed: ' . $e->getMessage());
+            return $fallback;
+        }
+    }
+}

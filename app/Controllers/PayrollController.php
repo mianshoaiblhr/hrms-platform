@@ -17,6 +17,15 @@ class PayrollController extends Controller
     // --------------------------------------------------------
     public function index(): void
     {
+        try {
+            ->_doIndex();
+        } catch (\Throwable ) {
+            error_log("[PayrollController::index] " . ->getMessage());
+            ->view("payroll/index", ['data' => ['data'=>[],'total'=>0,'per_page'=>25,'current_page'=>1,'last_page'=>1], 'filters' => [], 'departments' => [], 'employees' => [], 'leaveTypes' => [], 'stats' => []]);
+        }
+    }
+    private function _doIndex(): void
+    {
         $this->requirePermission('payroll.view');
 
         $periods = $this->db->fetchAll(
@@ -104,7 +113,7 @@ class PayrollController extends Controller
 
         $items = $this->db->fetchAll(
             "SELECT pi.*, 
-                    CONCAT(e.first_name, ' ', e.last_name) AS employee_name,
+                    (e.first_name || ' ' || e.last_name) AS employee_name,
                     e.employee_code, e.basic_salary AS contracted_salary,
                     d.name AS department_name, des.title AS designation
              FROM payroll_items pi
@@ -278,7 +287,7 @@ class PayrollController extends Controller
 
         $item = $this->db->fetchOne(
             "SELECT pi.*,
-                    CONCAT(e.first_name, ' ', e.last_name) AS employee_name,
+                    (e.first_name || ' ' || e.last_name) AS employee_name,
                     e.employee_code, e.cnic, e.designation_id, e.bank_name,
                     e.bank_account, e.ntn,
                     d.name AS department_name,

@@ -16,6 +16,16 @@ class EmployeeController extends Controller
     // --------------------------------------------------------
     public function index(): void
     {
+        try { $this->_index(); } catch (\Throwable $e) {
+            error_log('[EmployeeController] ' . $e->getMessage());
+            $this->view('employees/index', [
+                'data' => ['data'=>[],'total'=>0,'per_page'=>25,'current_page'=>1,'last_page'=>1],
+                'departments' => [], 'filters' => [], 'stats' => []
+            ]);
+        }
+    }
+    private function _index(): void
+    {
         $this->requirePermission('employees.view');
 
         $search     = $this->sanitize($this->input('search', ''));

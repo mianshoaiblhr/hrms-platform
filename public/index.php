@@ -141,13 +141,8 @@ require ROOT_PATH . DS . 'routes' . DS . 'web.php';
 try {
     $router->dispatch();
 } catch (\Throwable $e) {
+    error_log('[ORBIT HRMS] ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
     http_response_code(500);
-    echo '<html><body style="font-family:monospace;padding:2rem;background:#1a1a2e;color:#eee">';
-    echo '<h2 style="color:#e94560">&#9888; HRMS Error (debug mode)</h2>';
-    echo '<p style="color:#f5a623;font-size:1.1em">' . htmlspecialchars($e->getMessage()) . '</p>';
-    echo '<p style="color:#aaa">' . htmlspecialchars($e->getFile()) . ' : line ' . $e->getLine() . '</p>';
-    echo '<pre style="background:#0f0f23;padding:1rem;overflow:auto;font-size:0.8em;color:#7ec8e3">'
-        . htmlspecialchars($e->getTraceAsString()) . '</pre>';
-    echo '<p style="color:#555;font-size:0.75em">Remove debug output once issue is resolved.</p>';
-    echo '</body></html>';
+    $errView = RESOURCE_PATH . DS . 'views' . DS . 'errors' . DS . '500.php';
+    file_exists($errView) ? include $errView : print('<h1>Server Error</h1><a href="/">Home</a>');
 }

@@ -9,9 +9,7 @@ RUN apt-get update && apt-get install -y \
        gd zip opcache exif \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Fix MPM conflict — forcefully delete ALL mpm_* symlinks from mods-enabled,
-# then manually create only the mpm_prefork symlinks.
-# a2dismod is a no-op here because Apache isn't running during build.
+# ── Fix MPM conflict: wipe ALL mpm_* symlinks, add only prefork ──────────────
 RUN rm -f /etc/apache2/mods-enabled/mpm_event.conf \
           /etc/apache2/mods-enabled/mpm_event.load \
           /etc/apache2/mods-enabled/mpm_worker.conf \
@@ -26,7 +24,7 @@ RUN rm -f /etc/apache2/mods-enabled/mpm_event.conf \
 # Enable required modules
 RUN a2enmod rewrite headers deflate expires
 
-# PHP production settings
+# PHP settings
 RUN { \
     echo "upload_max_filesize = 20M"; \
     echo "post_max_size = 25M"; \
@@ -37,23 +35,27 @@ RUN { \
     echo "expose_php = Off"; \
 } >> /usr/local/etc/php/conf.d/hrms.ini
 
-# Apache VirtualHost — HRMS_PORT replaced at runtime by entrypoint
-RUN printf '<VirtualHost *:HRMS_PORT>\n\
+# ── Apache config: PORT substituted at runtime, ServerName suppresses warning ──
+RUN printf 'ServerName localhost\n\
+\n\
+<VirtualHost *:__PORT__>\n\
     DocumentRoot /var/www/html/public\n\
     <Directory /var/www/html/public>\n\
         AllowOverride All\n\
         Require all granted\n\
         Options -Indexes +FollowSymLinks\n\
     </Directory>\n\
-    ErrorLog ${APACHE_LOG_DIR}/error.log\n\
-    CustomLog ${APACHE_LOG_DIR}/access.log combined\n\
+    ErrorLog /proc/1/fd/2\n\
+    CustomLog /proc/1/fd/1 combined\n\
 </VirtualHost>\n' > /etc/apache2/sites-available/000-default.conf
 
-# Copy application files
+# Disable the default ports.conf — entrypoint writes a fresh one at runtime
+RUN echo "# managed by entrypoint" > /etc/apache2/ports.conf
+
+# Copy application
 WORKDIR /var/www/html
 COPY . .
 
-# Writable storage directories
 RUN mkdir -p storage/logs storage/uploads/employees \
              storage/uploads/documents storage/uploads/avatars \
              storage/cache storage/backups storage/temp \

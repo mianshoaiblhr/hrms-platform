@@ -12,7 +12,7 @@ use App\Services\ExportService;
 // =========================================================
 class AttendanceController extends Controller
 {
-    private Database $db;
+    protected Database $db;
 
     public function __construct() { $this->db = Database::getInstance(); }
 
@@ -178,7 +178,7 @@ class AttendanceController extends Controller
 
 class LeaveController extends Controller
 {
-    private Database $db;
+    protected Database $db;
     public function __construct() { $this->db = Database::getInstance(); }
 
     public function index(): void
@@ -398,7 +398,7 @@ class LeaveController extends Controller
 // =========================================================
 class DocumentController extends Controller
 {
-    private Database $db;
+    protected Database $db;
     public function __construct() { $this->db = Database::getInstance(); }
 
     public function index(): void

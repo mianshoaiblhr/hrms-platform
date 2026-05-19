@@ -11,7 +11,7 @@ use App\Core\AuditLogger;
 // =========================================================
 class UserController extends Controller
 {
-    private Database $db;
+    protected Database $db;
     public function __construct() { $this->db = Database::getInstance(); }
 
     public function index(): void
@@ -128,7 +128,7 @@ class UserController extends Controller
 // =========================================================
 class RoleController extends Controller
 {
-    private Database $db;
+    protected Database $db;
     public function __construct() { $this->db = Database::getInstance(); }
 
     public function index(): void
@@ -201,7 +201,7 @@ class RoleController extends Controller
 // =========================================================
 class SettingsController extends Controller
 {
-    private Database $db;
+    protected Database $db;
     public function __construct() { $this->db = Database::getInstance(); }
 
     public function index(): void
@@ -341,7 +341,7 @@ class SettingsController extends Controller
 
 class ReportController extends Controller
 {
-    private Database $db;
+    protected Database $db;
     public function __construct() { $this->db = Database::getInstance(); }
 
     public function index(): void
@@ -462,7 +462,7 @@ class ReportController extends Controller
 // =========================================================
 class AuditController extends Controller
 {
-    private Database $db;
+    protected Database $db;
     public function __construct() { $this->db = Database::getInstance(); }
 
     public function index(): void
@@ -524,7 +524,7 @@ class AuditController extends Controller
 // =========================================================
 class ProfileController extends Controller
 {
-    private Database $db;
+    protected Database $db;
     public function __construct() { $this->db = Database::getInstance(); }
 
     public function index(): void

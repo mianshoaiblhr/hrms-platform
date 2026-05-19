@@ -7,7 +7,7 @@ use App\Core\Auth;
 
 class DashboardController extends Controller
 {
-    private Database $db;
+    protected Database $db;
 
     public function __construct()
     {

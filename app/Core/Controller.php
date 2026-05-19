@@ -181,6 +181,44 @@ class Controller
         Session::flash('alert_type', $type);
         Session::flash('alert_message', $message);
     }
+    protected function getAllInput(): array
+    {
+        return array_merge($_GET, $_POST);
+    }
+
+    protected function generateTempPassword(int $length = 10): string
+    {
+        $chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#!';
+        $pass  = '';
+        for ($i = 0; $i < $length; $i++) {
+            $pass .= $chars[random_int(0, strlen($chars) - 1)];
+        }
+        return $pass;
+    }
+
+    protected function uploadFile(array $file, string $folder = 'uploads'): ?string
+    {
+        if (empty($file['tmp_name']) || $file['error'] !== UPLOAD_ERR_OK) return null;
+        $allowed = ['jpg','jpeg','png','gif','pdf','doc','docx','xls','xlsx'];
+        $ext     = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        if (!in_array($ext, $allowed) || $file['size'] > 10485760) return null;
+        $dir = (defined('STORAGE_PATH') ? STORAGE_PATH : '/var/www/html/storage')
+             . '/uploads/' . $folder;
+        if (!is_dir($dir)) mkdir($dir, 0775, true);
+        $dest = $dir . '/' . uniqid() . '_' . time() . '.' . $ext;
+        return move_uploaded_file($file['tmp_name'], $dest)
+            ? $folder . '/' . basename($dest) : null;
+    }
+
+    protected function auditLog(string $action, string $table, $recordId = null,
+                                array $old = [], array $new = []): void
+    {
+        try {
+            AuditLogger::log($action, $table, (int)$recordId, $table,
+                ucfirst($action) . ' on ' . $table, $old, $new);
+        } catch (\Throwable $e) { error_log('[Audit] ' . $e->getMessage()); }
+    }
+
 }
 
 // ============================================================
@@ -188,6 +226,7 @@ class Controller
 // ============================================================
 
 namespace App\Core;
+
 
 class AuditLogger
 {

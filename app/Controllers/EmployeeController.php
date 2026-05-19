@@ -276,7 +276,8 @@ class EmployeeController extends Controller
                 'eobi_number'        => $data['eobi_number'] ?? null,
                 'pessi_number'       => $data['pessi_number'] ?? null,
                 'profile_photo'      => $photoPath,
-                'status'  => 'active',
+                'employment_status' => 'probation',
+                'is_active'         => 1,
                 'created_by'         => $this->auth->id(),
             ]);
 

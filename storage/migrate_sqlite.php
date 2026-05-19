@@ -15,7 +15,8 @@ function migrate(PDO $db): void
         is_system INTEGER DEFAULT 0,
         hierarchy_level INTEGER DEFAULT 0,
         created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now'))
+        updated_at TEXT DEFAULT (datetime('now')),
+        deleted_at TEXT
     )");
 
     $db->exec("CREATE TABLE IF NOT EXISTS permissions (
@@ -172,7 +173,8 @@ function migrate(PDO $db): void
         approved_at TEXT,
         rejection_reason TEXT,
         created_at TEXT DEFAULT (datetime('now')),
-        updated_at TEXT DEFAULT (datetime('now'))
+        updated_at TEXT DEFAULT (datetime('now')),
+        deleted_at TEXT
     )");
 
     $db->exec("CREATE TABLE IF NOT EXISTS attendance (
@@ -375,6 +377,54 @@ function migrate(PDO $db): void
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now')),
         deleted_at TEXT
+    )");
+
+
+    $db->exec("CREATE TABLE IF NOT EXISTS payroll_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        type TEXT DEFAULT 'earning',
+        calculation_type TEXT DEFAULT 'fixed',
+        amount REAL DEFAULT 0,
+        percentage REAL DEFAULT 0,
+        percentage_of TEXT,
+        is_statutory INTEGER DEFAULT 0,
+        is_taxable INTEGER DEFAULT 1,
+        status TEXT DEFAULT 'active',
+        created_at TEXT DEFAULT (datetime('now')),
+        deleted_at TEXT
+    )");
+
+    $db->exec("CREATE TABLE IF NOT EXISTS document_categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now')),
+        deleted_at TEXT
+    )");
+
+    $db->exec("CREATE TABLE IF NOT EXISTS employee_loans (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        employee_id INTEGER NOT NULL,
+        loan_amount REAL NOT NULL,
+        balance_amount REAL NOT NULL,
+        interest_rate REAL DEFAULT 0,
+        term_months INTEGER DEFAULT 12,
+        monthly_installment REAL DEFAULT 0,
+        purpose TEXT,
+        status TEXT DEFAULT 'pending',
+        approved_by INTEGER,
+        approved_at TEXT,
+        loan_date TEXT,
+        requested_by INTEGER,
+        created_at TEXT DEFAULT (datetime('now')),
+        deleted_at TEXT
+    )");
+
+    $db->exec("CREATE TABLE IF NOT EXISTS system_configs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        config_key TEXT NOT NULL UNIQUE,
+        config_value TEXT,
+        updated_at TEXT DEFAULT (datetime('now'))
     )");
 
     // ── Seed roles ────────────────────────────────────────────────────────

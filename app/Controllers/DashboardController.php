@@ -20,14 +20,18 @@ class DashboardController extends Controller
         $userId = (int)$user['id'];
         $employeeId = (int)($user['employee_id'] ?? 0);
 
-        // KPI Stats
+        // KPI Stats — each wrapped so one bad query never kills the dashboard
+        $safeCount = function(string $sql, array $p = []): int {
+            try { return (int)$this->db->fetchColumn($sql, $p); }
+            catch (\Throwable $e) { return 0; }
+        };
         $stats = [
-            'total_employees'  => (int)$this->db->fetchColumn("SELECT COUNT(*) FROM employees WHERE status='active' AND deleted_at IS NULL"),
-            'pending_leaves'   => (int)$this->db->fetchColumn("SELECT COUNT(*) FROM leave_applications WHERE status='pending' AND deleted_at IS NULL"),
-            'today_present'    => (int)$this->db->fetchColumn("SELECT COUNT(*) FROM attendance WHERE attendance_date=CURDATE() AND status='present' AND deleted_at IS NULL"),
-            'today_absent'     => (int)$this->db->fetchColumn("SELECT COUNT(*) FROM attendance WHERE attendance_date=CURDATE() AND status='absent' AND deleted_at IS NULL"),
-            'pending_tasks'    => (int)$this->db->fetchColumn("SELECT COUNT(*) FROM tasks WHERE status='pending' AND deleted_at IS NULL"),
-            'unread_notifs'    => (int)$this->db->fetchColumn("SELECT COUNT(*) FROM notifications WHERE user_id=? AND read_at IS NULL", [$userId]),
+            'total_employees'  => $safeCount("SELECT COUNT(*) FROM employees WHERE status='active' AND deleted_at IS NULL"),
+            'pending_leaves'   => $safeCount("SELECT COUNT(*) FROM leave_applications WHERE status='pending'"),
+            'today_present'    => $safeCount("SELECT COUNT(*) FROM attendance WHERE attendance_date=CURDATE() AND status='present' AND deleted_at IS NULL"),
+            'today_absent'     => $safeCount("SELECT COUNT(*) FROM attendance WHERE attendance_date=CURDATE() AND status='absent' AND deleted_at IS NULL"),
+            'pending_tasks'    => $safeCount("SELECT COUNT(*) FROM tasks WHERE status='pending' AND deleted_at IS NULL"),
+            'unread_notifs'    => $safeCount("SELECT COUNT(*) FROM notifications WHERE user_id=? AND read_at IS NULL", [$userId]),
         ];
 
         // My attendance today (for employee role)

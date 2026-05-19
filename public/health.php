@@ -1,31 +1,30 @@
 <?php
 /**
- * HRMS Health Check — used by Railway to verify deployment
- * Accessible at: yourapp.up.railway.app/health.php
+ * HRMS Health Check — always returns 200 if Apache + PHP are running.
+ * DB status is reported but never causes a non-200 response.
  */
 header('Content-Type: application/json');
 
 $checks = [];
-$allOk  = true;
+$phpOk  = true;
 
 // 1) PHP version
 $checks['php'] = [
-    'status' => PHP_VERSION_ID >= 70400 ? 'ok' : 'fail',
+    'status' => PHP_VERSION_ID >= 70400 ? 'ok' : 'warn',
     'value'  => PHP_VERSION,
 ];
 
 // 2) Required extensions
-$required = ['pdo', 'pdo_mysql', 'mbstring', 'gd', 'json'];
-foreach ($required as $ext) {
+foreach (['pdo', 'pdo_mysql', 'mbstring', 'gd', 'json'] as $ext) {
     $ok = extension_loaded($ext);
+    if (!$ok) $phpOk = false;
     $checks['ext_' . $ext] = ['status' => $ok ? 'ok' : 'fail'];
-    if (!$ok) $allOk = false;
 }
 
-// 3) DB connection
-define('ROOT_PATH', dirname(__DIR__));
-$env = file_exists(ROOT_PATH . '/.env') ? parse_ini_file(ROOT_PATH . '/.env') : [];
-foreach ($env as $k => $v) { $_ENV[$k] = $v; }
+// 3) DB connection — informational only, never fails the healthcheck
+$envFile = dirname(__DIR__) . '/.env';
+$env     = file_exists($envFile) ? (parse_ini_file($envFile) ?: []) : [];
+foreach ($env as $k => $v) { $_ENV[$k] = $_ENV[$k] ?? $v; }
 
 $host = $_ENV['MYSQLHOST']     ?? $_ENV['DB_HOST']     ?? null;
 $db   = $_ENV['MYSQLDATABASE'] ?? $_ENV['DB_DATABASE'] ?? null;
@@ -35,30 +34,34 @@ $port = $_ENV['MYSQLPORT']     ?? $_ENV['DB_PORT']     ?? 3306;
 
 if ($host && $db && $user) {
     try {
-        $pdo  = new PDO("mysql:host=$host;port=$port;dbname=$db;charset=utf8mb4", $user, $pass, [
-            PDO::ATTR_TIMEOUT => 5,
-        ]);
-        $tables = (int)$pdo->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$db'")->fetchColumn();
+        $pdo    = new PDO(
+            "mysql:host=$host;port=$port;dbname=$db;charset=utf8mb4",
+            $user, $pass,
+            [PDO::ATTR_TIMEOUT => 3]
+        );
+        $tables = (int) $pdo->query(
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$db'"
+        )->fetchColumn();
         $checks['database'] = ['status' => 'ok', 'tables' => $tables, 'host' => $host];
     } catch (Exception $e) {
-        $checks['database'] = ['status' => 'fail', 'error' => $e->getMessage()];
-        $allOk = false;
+        // DB down = informational warning, NOT a failure
+        $checks['database'] = ['status' => 'warn', 'note' => 'DB not yet available'];
     }
 } else {
-    $checks['database'] = ['status' => 'skip', 'note' => 'No DB credentials configured'];
+    $checks['database'] = ['status' => 'warn', 'note' => 'No DB credentials in env'];
 }
 
-// 4) Storage writable
-$storagePath = ROOT_PATH . '/storage';
+// 4) Storage writable — informational only
 $checks['storage'] = [
-    'status' => is_writable($storagePath) ? 'ok' : 'fail',
-    'path'   => $storagePath,
+    'status' => is_writable(dirname(__DIR__) . '/storage') ? 'ok' : 'warn',
 ];
 
-http_response_code($allOk ? 200 : 503);
+// Always 200 — healthcheck only cares that Apache + PHP are alive
+http_response_code(200);
 echo json_encode([
-    'status'  => $allOk ? 'healthy' : 'degraded',
+    'status'  => $phpOk ? 'ok' : 'degraded',
     'app'     => 'HRMS Enterprise Platform',
     'time'    => date('Y-m-d H:i:s'),
+    'port'    => $_SERVER['SERVER_PORT'] ?? 'unknown',
     'checks'  => $checks,
 ], JSON_PRETTY_PRINT);

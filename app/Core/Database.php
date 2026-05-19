@@ -13,63 +13,78 @@ class Database
     private static ?Database $instance = null;
     private PDO $pdo;
 
-    private string $host;
-    private string $port;
-    private string $dbname;
-    private string $username;
-    private string $password;
-    private string $charset;
-
     private function __construct()
     {
-        $this->host     = getenv('DB_HOST')     ?: 'localhost';
-        $this->port     = getenv('DB_PORT')     ?: '3306';
-        $this->dbname   = getenv('DB_DATABASE') ?: 'hrms_db';
-        $this->username = getenv('DB_USERNAME') ?: 'root';
-        $this->password = getenv('DB_PASSWORD') ?: '';
-        $this->charset  = getenv('DB_CHARSET')  ?: 'utf8mb4';
+        // Read Railway's injected vars first, fall back to DB_* from .env
+        $host     = getenv('MYSQLHOST')     ?: getenv('DB_HOST')     ?: '127.0.0.1';
+        $port     = getenv('MYSQLPORT')     ?: getenv('DB_PORT')     ?: '3306';
+        $dbname   = getenv('MYSQLDATABASE') ?: getenv('DB_DATABASE') ?: 'hrms_db';
+        $username = getenv('MYSQLUSER')     ?: getenv('DB_USERNAME') ?: 'root';
+        $password = getenv('MYSQLPASSWORD') ?: getenv('DB_PASSWORD') ?: '';
+        $charset  = 'utf8mb4';
 
-        $this->connect();
-    }
-
-    private function connect(): void
-    {
-        $dsn = "mysql:host={$this->host};port={$this->port};dbname={$this->dbname};charset={$this->charset}";
-
-        $options = [
-            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_EMULATE_PREPARES   => false,
-            PDO::ATTR_PERSISTENT         => false,
-            PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
-        ];
+        $dsn = "mysql:host={$host};port={$port};dbname={$dbname};charset={$charset}";
 
         try {
-            $this->pdo = new PDO($dsn, $this->username, $this->password, $options);
-            $this->pdo->exec("SET time_zone = '+05:00'");
-            $this->pdo->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
+            $this->pdo = new PDO($dsn, $username, $password, [
+                PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES   => false,
+                PDO::ATTR_PERSISTENT         => false,
+                PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci",
+                PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
+            ]);
         } catch (PDOException $e) {
-            Logger::critical('Database connection failed: ' . $e->getMessage());
-            throw new \RuntimeException('Database connection failed. Please check configuration.');
+            // Show a friendly page instead of a raw 500
+            http_response_code(503);
+            $host_display = htmlspecialchars($host);
+            echo <<<HTML
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HRMS — Database Not Connected</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+</head>
+<body class="bg-light d-flex align-items-center justify-content-center" style="min-height:100vh">
+<div class="card shadow-sm" style="max-width:480px;width:100%">
+  <div class="card-body p-5 text-center">
+    <div class="display-1 mb-3">🗄️</div>
+    <h4 class="fw-bold">Database Not Connected</h4>
+    <p class="text-muted mb-4">
+      The HRMS app is running but cannot reach MySQL at
+      <code>{$host_display}</code>.
+    </p>
+    <div class="alert alert-info text-start small mb-4">
+      <strong>On Railway:</strong><br>
+      1. Click <strong>+ New → Database → MySQL</strong><br>
+      2. Wait ~30 seconds for it to provision<br>
+      3. Click <strong>Redeploy</strong> on this service<br>
+      4. Refresh this page
+    </div>
+    <button onclick="location.reload()" class="btn btn-primary">
+      🔄 Refresh
+    </button>
+  </div>
+</div>
+</body>
+</html>
+HTML;
+            exit;
         }
     }
 
-    public static function getInstance(): Database
+    public static function getInstance(): self
     {
-        if (self::$instance === null) {
+        if (!self::$instance) {
             self::$instance = new self();
         }
         return self::$instance;
     }
 
-    public function getPdo(): PDO
-    {
-        return $this->pdo;
-    }
+    // ── Query helpers ──────────────────────────────────────────────────────
 
-    /**
-     * Execute a query with bound parameters (SQL injection safe)
-     */
     public function query(string $sql, array $params = []): \PDOStatement
     {
         $stmt = $this->pdo->prepare($sql);
@@ -77,137 +92,62 @@ class Database
         return $stmt;
     }
 
-    /**
-     * Fetch a single record
-     */
-    public function fetchOne(string $sql, array $params = []): ?array
-    {
-        $stmt = $this->query($sql, $params);
-        $result = $stmt->fetch();
-        return $result ?: null;
-    }
-
-    /**
-     * Fetch all records
-     */
     public function fetchAll(string $sql, array $params = []): array
     {
-        $stmt = $this->query($sql, $params);
-        return $stmt->fetchAll();
+        return $this->query($sql, $params)->fetchAll();
     }
 
-    /**
-     * Fetch a single column value
-     */
+    public function fetchOne(string $sql, array $params = []): ?array
+    {
+        $row = $this->query($sql, $params)->fetch();
+        return $row ?: null;
+    }
+
     public function fetchColumn(string $sql, array $params = []): mixed
     {
-        $stmt = $this->query($sql, $params);
-        return $stmt->fetchColumn();
+        return $this->query($sql, $params)->fetchColumn();
     }
 
-    /**
-     * Insert a record
-     */
     public function insert(string $table, array $data): int
     {
-        $table   = $this->sanitizeIdentifier($table);
-        $columns = implode(', ', array_map([$this, 'sanitizeIdentifier'], array_keys($data)));
-        $placeholders = implode(', ', array_fill(0, count($data), '?'));
-
-        $sql = "INSERT INTO {$table} ({$columns}) VALUES ({$placeholders})";
-        $this->query($sql, array_values($data));
-
-        return (int)$this->pdo->lastInsertId();
+        $cols = implode(', ', array_keys($data));
+        $phs  = implode(', ', array_fill(0, count($data), '?'));
+        $this->query("INSERT INTO {$table} ({$cols}) VALUES ({$phs})", array_values($data));
+        return (int) $this->pdo->lastInsertId();
     }
 
-    /**
-     * Update records
-     */
-    public function update(string $table, array $data, string $where, array $whereParams = []): int
+    public function update(string $table, array $data, array $where): int
     {
-        $table = $this->sanitizeIdentifier($table);
-        $set   = implode(', ', array_map(
-            fn($col) => $this->sanitizeIdentifier($col) . ' = ?',
-            array_keys($data)
-        ));
-
-        $sql    = "UPDATE {$table} SET {$set} WHERE {$where}";
-        $params = array_merge(array_values($data), $whereParams);
-        $stmt   = $this->query($sql, $params);
-
+        $set   = implode(', ', array_map(fn($k) => "{$k} = ?", array_keys($data)));
+        $cond  = implode(' AND ', array_map(fn($k) => "{$k} = ?", array_keys($where)));
+        $stmt  = $this->query(
+            "UPDATE {$table} SET {$set} WHERE {$cond}",
+            [...array_values($data), ...array_values($where)]
+        );
         return $stmt->rowCount();
     }
 
-    /**
-     * Soft delete
-     */
     public function softDelete(string $table, int $id): int
     {
-        return $this->update($table, ['deleted_at' => date('Y-m-d H:i:s')], 'id = ?', [$id]);
+        return $this->update($table, ['deleted_at' => date('Y-m-d H:i:s')], ['id' => $id]);
     }
 
-    /**
-     * Begin transaction
-     */
-    public function beginTransaction(): void
+    public function paginate(string $sql, array $params, int $page, int $perPage = 25): array
     {
-        $this->pdo->beginTransaction();
-    }
-
-    /**
-     * Commit transaction
-     */
-    public function commit(): void
-    {
-        $this->pdo->commit();
-    }
-
-    /**
-     * Rollback transaction
-     */
-    public function rollback(): void
-    {
-        if ($this->pdo->inTransaction()) {
-            $this->pdo->rollBack();
-        }
-    }
-
-    /**
-     * Paginate query results
-     */
-    public function paginate(string $sql, array $params = [], int $page = 1, int $perPage = 20): array
-    {
-        $countSql  = "SELECT COUNT(*) FROM ({$sql}) AS count_query";
-        $total     = (int)$this->fetchColumn($countSql, $params);
-        $totalPages= (int)ceil($total / $perPage);
-        $offset    = ($page - 1) * $perPage;
-
-        $dataSql   = $sql . " LIMIT {$perPage} OFFSET {$offset}";
-        $data      = $this->fetchAll($dataSql, $params);
-
+        $total   = (int) $this->fetchColumn("SELECT COUNT(*) FROM ({$sql}) AS t", $params);
+        $offset  = ($page - 1) * $perPage;
+        $rows    = $this->fetchAll("{$sql} LIMIT {$perPage} OFFSET {$offset}", $params);
         return [
-            'data'        => $data,
-            'total'       => $total,
-            'per_page'    => $perPage,
-            'current_page'=> $page,
-            'last_page'   => $totalPages,
-            'from'        => $offset + 1,
-            'to'          => min($offset + $perPage, $total),
+            'data'         => $rows,
+            'total'        => $total,
+            'per_page'     => $perPage,
+            'current_page' => $page,
+            'last_page'    => max(1, (int) ceil($total / $perPage)),
         ];
     }
 
-    /**
-     * Sanitize column/table identifiers
-     */
-    private function sanitizeIdentifier(string $identifier): string
-    {
-        if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $identifier)) {
-            throw new \InvalidArgumentException("Invalid SQL identifier: {$identifier}");
-        }
-        return "`{$identifier}`";
-    }
-
-    // Prevent cloning and unserialization
-    private function __clone() {}
-    public function __wakeup() { throw new \RuntimeException("Cannot unserialize singleton."); }
+    public function beginTransaction(): void { $this->pdo->beginTransaction(); }
+    public function commit(): void           { $this->pdo->commit(); }
+    public function rollback(): void         { $this->pdo->rollBack(); }
+    public function lastInsertId(): int      { return (int) $this->pdo->lastInsertId(); }
 }

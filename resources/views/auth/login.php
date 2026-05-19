@@ -1,54 +1,69 @@
 <?php
-$pageTitle = 'Login';
-$subtitle  = 'Sign in to your account';
+$pageTitle = 'Log In';
 ob_start();
 ?>
-<form method="POST" action="/login" id="loginForm">
+
+<form method="POST" action="/login" id="loginForm" style="display:flex;flex-direction:column;gap:14px">
   <?= csrf_field() ?>
 
-  <div class="form-floating mb-3">
-    <input type="text" class="form-control" id="username" name="username"
-           placeholder="Username" value="<?= e($_POST['username'] ?? '') ?>"
-           autocomplete="username" required autofocus>
-    <label for="username"><i class="fas fa-user me-1"></i>Username or Email</label>
-  </div>
+  <input
+    type="text"
+    name="username"
+    class="fb-input"
+    placeholder="Username or email address"
+    value="<?= e($_POST['username'] ?? '') ?>"
+    autocomplete="username"
+    required
+    autofocus
+  >
 
-  <div class="form-floating mb-3 position-relative">
-    <input type="password" class="form-control" id="password" name="password"
-           placeholder="Password" autocomplete="current-password" required>
-    <label for="password"><i class="fas fa-lock me-1"></i>Password</label>
-    <button type="button" class="btn-toggle-pw" onclick="togglePassword()" title="Show/Hide">
-      <i class="fas fa-eye" id="pwIcon"></i>
+  <div class="pw-wrap">
+    <input
+      type="password"
+      name="password"
+      id="fb-pw"
+      class="fb-input"
+      placeholder="Password"
+      autocomplete="current-password"
+      required
+    >
+    <button type="button" class="pw-toggle" onclick="togglePw()" title="Show password">
+      <i class="fas fa-eye" id="pw-icon"></i>
     </button>
   </div>
 
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <div class="form-check">
-      <input class="form-check-input" type="checkbox" id="remember" name="remember" value="1">
-      <label class="form-check-label small" for="remember">Remember me</label>
-    </div>
-    <a href="/forgot-password" class="text-primary text-decoration-none small fw-semibold">Forgot Password?</a>
+  <button type="submit" class="fb-btn" id="loginBtn">Log in</button>
+
+  <div class="fb-row">
+    <label class="fb-check">
+      <input type="checkbox" name="remember" value="1">
+      Remember me
+    </label>
+    <a href="/forgot-password" class="fb-link">Forgot password?</a>
   </div>
 
-  <button type="submit" class="btn btn-primary btn-auth" id="loginBtn">
-    <i class="fas fa-sign-in-alt me-2"></i>Sign In
-  </button>
+  <div class="fb-divider"></div>
+
+  <div style="text-align:center">
+    <a href="#" style="display:inline-block;padding:0">
+      <button type="button" class="fb-btn-new" style="padding:14px 24px;border-radius:6px">
+        Create new account
+      </button>
+    </a>
+  </div>
 </form>
 
-<style>
-.btn-toggle-pw{position:absolute;right:15px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text-muted);cursor:pointer;z-index:10;padding:4px}
-</style>
 <script>
-function togglePassword() {
-  const inp = document.getElementById('password');
-  const ico = document.getElementById('pwIcon');
-  if (inp.type === 'password') { inp.type='text'; ico.className='fas fa-eye-slash'; }
-  else { inp.type='password'; ico.className='fas fa-eye'; }
+function togglePw(){
+  const f=document.getElementById('fb-pw');
+  const i=document.getElementById('pw-icon');
+  f.type=f.type==='password'?'text':'password';
+  i.className=f.type==='password'?'fas fa-eye':'fas fa-eye-slash';
 }
-document.getElementById('loginForm').addEventListener('submit', function() {
-  const btn = document.getElementById('loginBtn');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Signing in...';
+document.getElementById('loginForm').addEventListener('submit',function(){
+  const btn=document.getElementById('loginBtn');
+  btn.disabled=true;
+  btn.innerHTML='<i class="fas fa-spinner fa-spin me-1"></i> Logging in...';
 });
 </script>
 

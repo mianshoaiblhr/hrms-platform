@@ -119,11 +119,11 @@ class Attendance extends Model
         return $this->db->fetchOne(
             "SELECT
                 COUNT(*) AS total_days,
-                SUM(status='present') AS present,
-                SUM(status='absent') AS absent,
-                SUM(status='late') AS late,
-                SUM(status='half_day') AS half_day,
-                SUM(status='on_leave') AS on_leave,
+                SUM(CASE WHEN status='present' THEN 1 ELSE 0 END) AS present,
+                SUM(CASE WHEN status='absent' THEN 1 ELSE 0 END) AS absent,
+                SUM(CASE WHEN status='late' THEN 1 ELSE 0 END) AS late,
+                SUM(CASE WHEN status='half_day' THEN 1 ELSE 0 END) AS half_day,
+                SUM(CASE WHEN status='on_leave' THEN 1 ELSE 0 END) AS on_leave,
                 COALESCE(SUM(overtime_minutes),0) AS total_overtime,
                 COALESCE(SUM(late_minutes),0) AS total_late
              FROM attendance WHERE employee_id = ?

@@ -94,81 +94,93 @@ class Database
     }
 
     /**
-     * Translate MySQL-specific SQL to SQLite-compatible SQL.
-     * Handles: DATE_SUB, DATE_ADD, DATE_FORMAT, CURDATE(), NOW(),
-     *          UNIX_TIMESTAMP(), backtick identifiers.
+     * Translate MySQL SQL to SQLite.
+     * Handles: CONCAT, MONTH, YEAR, DAY, DATE_SUB, DATE_ADD, DATE_FORMAT,
+     *          IFNULL, NOW(), CURDATE(), SUM(col=val), UNIX_TIMESTAMP
      */
     private static function toSQLite(string $sql): string
     {
-        // 1. DATE_FORMAT(expr, 'fmt') → strftime('fmt', expr)
-        //    Must run before DATE_ADD/DATE_SUB so nested calls resolve correctly
+        // 1. CONCAT(a, b, c, ...) → (a || b || c || ...)
+        $sql = preg_replace_callback(
+            '/CONCAT\s*\(([^()]+(?:\([^()]*\)[^()]*)*)\)/i',
+            function ($m) {
+                $parts = array_map('trim', str_getcsv($m[1], ','));
+                return '(' . implode(" || ", $parts) . ')';
+            },
+            $sql
+        );
+
+        // 2. IFNULL(a, b) → COALESCE(a, b)
+        $sql = preg_replace('/IFNULL\s*\(/i', 'COALESCE(', $sql);
+
+        // 3. SUM(col = 'val') → SUM(CASE WHEN col='val' THEN 1 ELSE 0 END)
+        $sql = preg_replace_callback(
+            "/SUM\s*\(\s*([a-zA-Z_.]+)\s*=\s*'([^']*)'\s*\)/i",
+            fn($m) => "SUM(CASE WHEN {$m[1]}='{$m[2]}' THEN 1 ELSE 0 END)",
+            $sql
+        );
+
+        // 4. DATE_FORMAT(expr, 'fmt') → strftime('fmt', expr)
         $sql = preg_replace_callback(
             "/DATE_FORMAT\s*\(\s*(.+?)\s*,\s*'([^']*)'\s*\)/i",
             function ($m) {
-                $expr = self::resolveDateExpr(trim($m[1]));
-                $fmt  = str_replace('%i', '%M', $m[2]); // MySQL %i = minutes → SQLite %M
+                $expr = self::normDateExpr(trim($m[1]));
+                $fmt  = str_replace('%i', '%M', $m[2]);
                 return "strftime('{$fmt}', {$expr})";
             },
             $sql
         );
 
-        // 2. DATE_SUB(expr, INTERVAL n UNIT) → datetime/date('now', '-n units')
+        // 5. DATE_SUB(expr, INTERVAL n UNIT)
         $sql = preg_replace_callback(
             '/DATE_SUB\s*\(\s*(.+?)\s*,\s*INTERVAL\s+(\d+)\s+(SECOND|MINUTE|HOUR|DAY|MONTH|YEAR)S?\s*\)/i',
-            fn($m) => self::intervalExpr($m[1], '-', $m[2], $m[3]),
+            fn($m) => self::sqliteInterval($m[1], '-', $m[2], $m[3]),
             $sql
         );
 
-        // 3. DATE_ADD(expr, INTERVAL n UNIT) → datetime/date('now', '+n units')
+        // 6. DATE_ADD(expr, INTERVAL n UNIT)
         $sql = preg_replace_callback(
             '/DATE_ADD\s*\(\s*(.+?)\s*,\s*INTERVAL\s+(\d+)\s+(SECOND|MINUTE|HOUR|DAY|MONTH|YEAR)S?\s*\)/i',
-            fn($m) => self::intervalExpr($m[1], '+', $m[2], $m[3]),
+            fn($m) => self::sqliteInterval($m[1], '+', $m[2], $m[3]),
             $sql
         );
 
-        // 4. Simple replacements (case-insensitive, longest first)
-        $search  = ['UNIX_TIMESTAMP()', 'NOW()', 'CURDATE()'];
-        $replace = ["strftime('%s','now')", "datetime('now')", "date('now')"];
-        foreach ($search as $i => $s) {
-            $sql = str_ireplace($s, $replace[$i], $sql);
-        }
+        // 7. MONTH(expr), YEAR(expr), DAY(expr)
+        $sql = preg_replace_callback(
+            '/(MONTH|YEAR|DAY)\s*\(\s*(.+?)\s*\)/i',
+            function ($m) {
+                $fmt  = ['MONTH'=>'%m','YEAR'=>'%Y','DAY'=>'%d'][strtoupper($m[1])];
+                $expr = self::normDateExpr(trim($m[2]));
+                return "strftime('{$fmt}', {$expr})";
+            },
+            $sql
+        );
+
+        // 8. Simple substitutions (after above to avoid double-processing)
+        $sql = str_ireplace(
+            ["UNIX_TIMESTAMP()", "NOW()", "CURDATE()"],
+            ["strftime('%s','now')", "datetime('now')", "date('now')"],
+            $sql
+        );
 
         return $sql;
     }
 
-    private static function resolveDateExpr(string $expr): string
+    private static function normDateExpr(string $e): string
     {
-        if (stripos($expr, 'CURDATE()') !== false) return str_ireplace('CURDATE()', 'now', $expr);
-        if (stripos($expr, 'NOW()')    !== false) return str_ireplace('NOW()',    'now', $expr);
-        // bare column name → pass through
-        return $expr;
+        $e = trim($e);
+        if (stripos($e, 'CURDATE()') !== false) return str_ireplace('CURDATE()', "'now'", $e);
+        if (stripos($e, 'NOW()')    !== false) return str_ireplace('NOW()',    "'now'", $e);
+        // Bare column name — pass through as-is
+        return $e;
     }
 
-    private static function intervalExpr(string $base, string $sign, string $n, string $unit): string
+    private static function sqliteInterval(string $base, string $sign, string $n, string $unit): string
     {
-        $base = trim($base);
-        // Choose date() vs datetime() based on precision
-        $useDateOnly = in_array(strtoupper($unit), ['DAY','MONTH','YEAR'])
-                    && stripos($base, 'CURDATE') !== false;
-        $fn   = $useDateOnly ? 'date' : 'datetime';
-        $mod  = "{$sign}{$n} " . strtolower($unit) . 's';
-        return "{$fn}('now', '{$mod}')";
-    }
-
-    public function fetchAll(string $sql, array $params = []): array
-    {
-        return $this->query($sql, $params)->fetchAll();
-    }
-
-    public function fetchOne(string $sql, array $params = []): ?array
-    {
-        $row = $this->query($sql, $params)->fetch();
-        return $row ?: null;
-    }
-
-    public function fetchColumn(string $sql, array $params = []): mixed
-    {
-        return $this->query($sql, $params)->fetchColumn();
+        $u   = strtolower($unit) . 's';
+        $fn  = in_array(strtoupper($unit), ['DAY','MONTH','YEAR'])
+             && stripos($base, 'CURDATE') !== false ? 'date' : 'datetime';
+        return "{$fn}('now', '{$sign}{$n} {$u}')";
     }
 
     public function insert(string $table, array $data): int

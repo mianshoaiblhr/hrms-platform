@@ -30,7 +30,7 @@ class EmployeeController extends Controller
         if (!in_array($sortDir, ['ASC', 'DESC'])) $sortDir = 'DESC';
 
         $sql = "SELECT e.id, e.employee_code, e.first_name, e.last_name, e.cnic,
-                       e.mobile, e.join_date, e.employment_status, e.basic_salary,
+                       e.mobile, e.join_date, e.status, e.basic_salary,
                        e.profile_photo, e.contract_type,
                        d.name AS department_name, des.title AS designation,
                        u.email, u.last_login_at
@@ -51,7 +51,7 @@ class EmployeeController extends Controller
             $params[] = $department;
         }
         if ($status) {
-            $sql    .= " AND e.employment_status = ?";
+            $sql    .= " AND e.status = ?";
             $params[] = $status;
         }
 
@@ -163,7 +163,7 @@ class EmployeeController extends Controller
 
         $departments  = $this->db->fetchAll("SELECT id, name FROM departments WHERE is_active = 1 ORDER BY name");
         $designations = $this->db->fetchAll("SELECT id, title, department_id FROM designations WHERE is_active = 1 ORDER BY title");
-        $managers     = $this->db->fetchAll("SELECT id, CONCAT(first_name, ' ', last_name) AS name FROM employees WHERE employment_status = 'active' AND deleted_at IS NULL ORDER BY first_name");
+        $managers     = $this->db->fetchAll("SELECT id, CONCAT(first_name, ' ', last_name) AS name FROM employees WHERE status = 'active' AND deleted_at IS NULL ORDER BY first_name");
         $shifts       = $this->db->fetchAll("SELECT id, name FROM shifts WHERE is_active = 1");
 
         $this->view('employees.create', [
@@ -266,7 +266,7 @@ class EmployeeController extends Controller
                 'eobi_number'        => $data['eobi_number'] ?? null,
                 'pessi_number'       => $data['pessi_number'] ?? null,
                 'profile_photo'      => $photoPath,
-                'employment_status'  => 'active',
+                'status'  => 'active',
                 'created_by'         => $this->auth->id(),
             ]);
 
@@ -336,7 +336,7 @@ class EmployeeController extends Controller
 
         $departments  = $this->db->fetchAll("SELECT id, name FROM departments WHERE is_active = 1 ORDER BY name");
         $designations = $this->db->fetchAll("SELECT id, title, department_id FROM designations WHERE is_active = 1 ORDER BY title");
-        $managers     = $this->db->fetchAll("SELECT id, CONCAT(first_name, ' ', last_name) AS name FROM employees WHERE employment_status = 'active' AND id != ? AND deleted_at IS NULL ORDER BY first_name", [$id]);
+        $managers     = $this->db->fetchAll("SELECT id, CONCAT(first_name, ' ', last_name) AS name FROM employees WHERE status = 'active' AND id != ? AND deleted_at IS NULL ORDER BY first_name", [$id]);
 
         $this->view('employees.edit', compact('employee', 'departments', 'designations', 'managers') + [
             'title'      => 'Edit Employee',
@@ -414,7 +414,7 @@ class EmployeeController extends Controller
         $separationDate  = $this->input('separation_date', date('Y-m-d'));
 
         $this->db->update('employees', [
-            'employment_status' => 'terminated',
+            'status' => 'terminated',
             'separation_date'   => $separationDate,
             'separation_reason' => $reason,
             'is_active'         => 0,
@@ -442,13 +442,13 @@ class EmployeeController extends Controller
 
         $employees = $this->db->fetchAll(
             "SELECT e.employee_code, CONCAT(e.first_name, ' ', e.last_name) AS name,
-                    e.cnic, e.mobile, e.official_email, e.join_date, e.employment_status,
+                    e.cnic, e.mobile, e.official_email, e.join_date, e.status,
                     e.contract_type, e.basic_salary, e.bank_account,
                     d.name AS department, des.title AS designation
              FROM employees e
              JOIN departments d ON e.department_id = d.id
              JOIN designations des ON e.designation_id = des.id
-             WHERE e.deleted_at IS NULL AND e.employment_status = 'active'
+             WHERE e.deleted_at IS NULL AND e.status = 'active'
              ORDER BY e.first_name"
         );
 
@@ -513,10 +513,10 @@ class EmployeeController extends Controller
     private function getEmployeeStats(): array
     {
         return [
-            'total'       => $this->db->fetchColumn("SELECT COUNT(*) FROM employees WHERE deleted_at IS NULL AND employment_status = 'active'"),
-            'new_this_month' => $this->db->fetchColumn("SELECT COUNT(*) FROM employees WHERE MONTH(join_date) = MONTH(NOW()) AND YEAR(join_date) = YEAR(NOW()) AND deleted_at IS NULL"),
+            'total'       => $this->db->fetchColumn("SELECT COUNT(*) FROM employees WHERE deleted_at IS NULL AND status = 'active'"),
+            'new_this_month' => $this->db->fetchColumn("SELECT COUNT(*) FROM employees WHERE strftime('%m',joining_date) = strftime('%m','now') AND strftime('%Y',joining_date) = strftime('%Y','now') AND deleted_at IS NULL"),
             'on_leave'    => $this->db->fetchColumn("SELECT COUNT(DISTINCT employee_id) FROM leave_applications WHERE status = 'approved' AND CURDATE() BETWEEN from_date AND to_date"),
-            'departments' => $this->db->fetchColumn("SELECT COUNT(DISTINCT department_id) FROM employees WHERE deleted_at IS NULL AND employment_status = 'active'"),
+            'departments' => $this->db->fetchColumn("SELECT COUNT(DISTINCT department_id) FROM employees WHERE deleted_at IS NULL AND status = 'active'"),
         ];
     }
     public function payslips(int $id): void

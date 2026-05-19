@@ -148,31 +148,6 @@ class AttendanceController extends Controller
         $this->flash('success', "$imported attendance records imported.");
         $this->redirect('/attendance');
     }
-}
-
-// =========================================================
-// Leave Controller
-// =========================================================
-    public function mark(): void
-    {
-        $this->requirePermission('attendance.create');
-        $this->store();
-    }
-
-    public function monthly(): void
-    {
-        $this->requirePermission('attendance.view');
-        $month = $this->input('month', date('Y-m'));
-        $deptId = $this->input('dept', '');
-        $data = ['month' => $month, 'dept' => $deptId, 'rows' => []];
-        $this->view('attendance/index', $data);
-    }
-
-    public function report(): void
-    {
-        $this->requirePermission('attendance.view');
-        $this->index();
-    }
 
 }
 
@@ -210,7 +185,7 @@ class LeaveController extends Controller
         if (!$employeeId) { $this->abort(403, 'No employee profile linked.'); }
         $leaveTypes = $this->db->fetchAll("SELECT * FROM leave_types WHERE status='active' ORDER BY name");
         $balances = $this->db->fetchAll(
-            "SELECT lb.*, lt.name FROM leave_balances lb JOIN leave_types lt ON lb.leave_type_id=lt.id WHERE lb.employee_id=? AND lb.year=YEAR(NOW())",
+            "SELECT lb.*, lt.name FROM leave_balances lb JOIN leave_types lt ON lb.leave_type_id=lt.id WHERE lb.employee_id=? AND lb.year=strftime('%Y','now')",
             [$employeeId]
         );
         $this->view('leaves/apply', compact('leaveTypes','balances'));
@@ -247,7 +222,7 @@ class LeaveController extends Controller
 
         // Check balance
         $balance = $this->db->fetchOne(
-            "SELECT * FROM leave_balances WHERE employee_id=? AND leave_type_id=? AND year=YEAR(NOW())",
+            "SELECT * FROM leave_balances WHERE employee_id=? AND leave_type_id=? AND year=strftime('%Y','now')",
             [$employeeId, $data['leave_type_id']]
         );
         if ($balance && $balance['remaining_days'] < $days) {
@@ -304,7 +279,7 @@ class LeaveController extends Controller
         // Deduct from balance
         $this->db->query(
             "UPDATE leave_balances SET used_days=used_days+?, remaining_days=remaining_days-?
-             WHERE employee_id=? AND leave_type_id=? AND year=YEAR(NOW())",
+             WHERE employee_id=? AND leave_type_id=? AND year=strftime('%Y','now')",
             [$leave['days'], $leave['days'], $leave['employee_id'], $leave['leave_type_id']]
         );
 

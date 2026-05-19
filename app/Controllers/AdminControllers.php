@@ -11,7 +11,7 @@ use App\Core\AuditLogger;
 // =========================================================
 class UserController extends Controller
 {
-    protected Database $db;
+    private Database $db;
     public function __construct() { $this->db = Database::getInstance(); }
 
     public function index(): void
@@ -28,7 +28,7 @@ class UserController extends Controller
     {
         $this->requirePermission('users.create');
         $roles     = $this->db->fetchAll("SELECT * FROM roles WHERE status='active' ORDER BY name");
-        $employees = $this->db->fetchAll("SELECT e.id, CONCAT(e.first_name,' ',e.last_name,' (',e.employee_code,')') AS name FROM employees e LEFT JOIN users u ON e.id=u.employee_id WHERE u.id IS NULL AND e.deleted_at IS NULL ORDER BY e.first_name");
+        $employees = $this->db->fetchAll("SELECT e.id, (e.first_name||' '||e.last_name||' ('||e.employee_code||')') AS name FROM employees e LEFT JOIN users u ON e.id=u.employee_id WHERE u.id IS NULL AND e.deleted_at IS NULL ORDER BY e.first_name");
         $this->view('settings/user_form', compact('roles','employees'));
     }
 
@@ -128,7 +128,7 @@ class UserController extends Controller
 // =========================================================
 class RoleController extends Controller
 {
-    protected Database $db;
+    private Database $db;
     public function __construct() { $this->db = Database::getInstance(); }
 
     public function index(): void
@@ -184,14 +184,10 @@ class RoleController extends Controller
     {
         $this->requirePermission('roles.delete');
         $this->verifyCsrf();
-        $role = $this->db->fetchOne("SELECT * FROM roles WHERE id = ?", [$id]);
-        if (!$role || $role['is_system']) {
-            $this->flash('error', 'Cannot delete system roles.');
-            $this->redirect('/roles');
-        }
+        $role = $this->db->fetchOne("SELECT * FROM roles WHERE id=?", [$id]);
+        if (!$role || $role['is_system']) { $this->flash('error', 'Cannot delete system roles.'); $this->redirect('/roles'); }
         $this->db->update('roles', ['deleted_at' => date('Y-m-d H:i:s')], ['id' => $id]);
-        $this->flash('success', 'Role deleted.');
-        $this->redirect('/roles');
+        $this->flash('success', 'Role deleted.'); $this->redirect('/roles');
     }
 
 }
@@ -201,7 +197,7 @@ class RoleController extends Controller
 // =========================================================
 class SettingsController extends Controller
 {
-    protected Database $db;
+    private Database $db;
     public function __construct() { $this->db = Database::getInstance(); }
 
     public function index(): void
@@ -271,7 +267,7 @@ class SettingsController extends Controller
     {
         $this->requirePermission('settings.view');
         $year = (int)$this->input('year', date('Y'));
-        $holidays = $this->db->fetchAll("SELECT * FROM holidays WHERE YEAR(holiday_date)=? ORDER BY holiday_date", [$year]);
+        $holidays = $this->db->fetchAll("SELECT * FROM holidays WHERE strftime('%Y',holiday_date)=? ORDER BY holiday_date", [$year]);
         $this->view('settings/holidays', compact('holidays','year'));
     }
 
@@ -289,59 +285,19 @@ class SettingsController extends Controller
         if ($exists) { $this->db->update('system_configs', ['config_value'=>$value,'updated_at'=>date('Y-m-d H:i:s')], 'config_group=? AND config_key=?', [$group,$key]); }
         else { $this->db->insert('system_configs', ['config_group'=>$group,'config_key'=>$key,'config_value'=>$value,'created_at'=>date('Y-m-d H:i:s')]); }
     }
-    public function company(): void
-    {
-        $this->requirePermission('settings.company');
-        $this->index(); // handled by main index with tab
-    }
-
-    public function backup(): void
-    {
-        $this->requirePermission('settings.system');
-        $this->json(['success' => true, 'message' => 'Backup feature coming soon']);
-    }
-
-    public function security(): void
-    {
-        $this->requirePermission('settings.system');
-        $this->index();
-    }
-
-    public function shifts(): void
-    {
-        $this->requirePermission('settings.view');
-        $this->index();
-    }
+    public function company(): void { $this->index(); }
+    public function backup(): void { $this->json(['success' => true, 'message' => 'Coming soon']); }
+    public function security(): void { $this->index(); }
+    public function shifts(): void { $this->index(); }
 
 }
 
 // =========================================================
 // Report Controller
 // =========================================================
-
-    public function employees(): void
-    {
-        $this->requirePermission('reports.employees');
-        $departments = $this->db->fetchAll("SELECT id, name FROM departments WHERE deleted_at IS NULL ORDER BY name");
-        $this->view('reports/payroll', ['report' => null, 'departments' => $departments, 'filters' => []]);
-    }
-
-    public function generate(): void
-    {
-        $this->requirePermission('reports.view');
-        $type = $this->input('type', 'payroll');
-        $this->redirect("/reports/{$type}");
-    }
-
-    public function leaves(): void
-    {
-        $this->requirePermission('reports.leaves');
-        $this->view('reports/payroll', ['report' => null, 'departments' => [], 'filters' => []]);
-    }
-
 class ReportController extends Controller
 {
-    protected Database $db;
+    private Database $db;
     public function __construct() { $this->db = Database::getInstance(); }
 
     public function index(): void
@@ -360,7 +316,7 @@ class ReportController extends Controller
         $where = "pp.start_date >= ? AND pp.end_date <= ?";
         if ($dept) { $where .= " AND e.department_id = ?"; $params[] = $dept; }
         $data = $this->db->fetchAll(
-            "SELECT e.employee_code, CONCAT(e.first_name,' ',e.last_name) AS name,
+            "SELECT e.employee_code, (e.first_name||' '||e.last_name) AS name,
                     d.name AS dept, pp.period_name,
                     pi.gross_salary, pi.total_deductions, pi.net_salary, pi.status
              FROM payroll_items pi
@@ -387,7 +343,7 @@ class ReportController extends Controller
         $params = [$from, $to];
         $deptCond = $dept ? " AND e.department_id = $dept" : '';
         $data = $this->db->fetchAll(
-            "SELECT e.employee_code, CONCAT(e.first_name,' ',e.last_name) AS name,
+            "SELECT e.employee_code, (e.first_name||' '||e.last_name) AS name,
                     d.name AS dept,
                     SUM(a.status='present') AS present,
                     SUM(a.status='absent') AS absent,
@@ -413,13 +369,13 @@ class ReportController extends Controller
         $this->requirePermission('reports.tax');
         $year = (int)$this->input('year', date('Y'));
         $data = $this->db->fetchAll(
-            "SELECT e.employee_code, CONCAT(e.first_name,' ',e.last_name) AS name, e.cnic, e.ntn_number,
+            "SELECT e.employee_code, (e.first_name||' '||e.last_name) AS name, e.cnic, e.ntn_number,
                     COALESCE(SUM(pid.amount),0) AS total_income_tax
              FROM employees e
              JOIN payroll_items pi ON pi.employee_id=e.id
              JOIN payroll_item_details pid ON pid.payroll_item_id=pi.id
              JOIN salary_components sc ON pid.component_id=sc.id
-             WHERE sc.type='deduction' AND sc.name='Income Tax' AND YEAR(pi.created_at)=?
+             WHERE sc.type='deduction' AND sc.name='Income Tax' AND strftime('%Y',pi.created_at)=?
              AND pi.deleted_at IS NULL AND e.deleted_at IS NULL
              GROUP BY e.id ORDER BY e.first_name",
             [$year]
@@ -437,7 +393,7 @@ class ReportController extends Controller
         $from = $this->input('from', date('Y-m-01'));
         $to   = $this->input('to', date('Y-m-d'));
         $data = $this->db->fetchAll(
-            "SELECT e.employee_code, CONCAT(e.first_name,' ',e.last_name) AS name,
+            "SELECT e.employee_code, (e.first_name||' '||e.last_name) AS name,
                     e.cnic, e.eobi_number, e.date_of_birth,
                     COALESCE(SUM(CASE WHEN sc.name='EOBI Employee' THEN pid.amount ELSE 0 END),0) AS employee_contribution,
                     COALESCE(SUM(CASE WHEN sc.name='EOBI Employer' THEN pid.amount ELSE 0 END),0) AS employer_contribution
@@ -455,6 +411,25 @@ class ReportController extends Controller
         }
         $this->view('reports/eobi', compact('data','from','to'));
     }
+    public function employees(): void
+    {
+        $this->requirePermission('reports.view');
+        $departments = $this->db->fetchAll("SELECT id, name FROM departments WHERE deleted_at IS NULL ORDER BY name");
+        $this->view('reports/payroll', ['report' => null, 'departments' => $departments, 'filters' => []]);
+    }
+
+    public function generate(): void
+    {
+        $this->requirePermission('reports.view');
+        $this->redirect('/reports/' . $this->input('type', 'payroll'));
+    }
+
+    public function leaves(): void
+    {
+        $this->requirePermission('reports.view');
+        $this->view('reports/payroll', ['report' => null, 'departments' => [], 'filters' => []]);
+    }
+
 }
 
 // =========================================================
@@ -462,7 +437,7 @@ class ReportController extends Controller
 // =========================================================
 class AuditController extends Controller
 {
-    protected Database $db;
+    private Database $db;
     public function __construct() { $this->db = Database::getInstance(); }
 
     public function index(): void
@@ -485,7 +460,7 @@ class AuditController extends Controller
         $whereStr = implode(' AND ', $where);
         $base = "FROM audit_logs al LEFT JOIN users u ON al.user_id=u.id LEFT JOIN employees e ON u.employee_id=e.id WHERE $whereStr";
         $logs = $this->db->paginate(
-            "SELECT al.*, u.username, CONCAT(e.first_name,' ',e.last_name) AS full_name $base ORDER BY al.created_at DESC",
+            "SELECT al.*, u.username, (e.first_name||' '||e.last_name) AS full_name $base ORDER BY al.created_at DESC",
             "SELECT COUNT(*) $base", $params, (int)$this->input('page',1)
         );
         $users = $this->db->fetchAll("SELECT u.id, u.username FROM users u WHERE u.deleted_at IS NULL ORDER BY u.username");
@@ -506,15 +481,12 @@ class AuditController extends Controller
     {
         $this->requirePermission('audit.view');
         header('Content-Type: text/csv');
-        header('Content-Disposition: attachment; filename="audit_log_' . date('Y-m-d') . '.csv"');
-        $logs = $this->db->fetchAll("SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 10000");
+        header('Content-Disposition: attachment; filename="audit_' . date('Y-m-d') . '.csv"');
+        $rows = $this->db->fetchAll("SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 5000");
         $out = fopen('php://output', 'w');
-        fputcsv($out, ['ID','User','Action','Module','Record ID','Description','IP','Date']);
-        foreach ($logs as $l) {
-            fputcsv($out, [$l['id'],$l['user_name'],$l['action'],$l['module'] ?? '',$l['record_id'],$l['description'] ?? '',$l['ip_address'],$l['created_at']]);
-        }
-        fclose($out);
-        exit;
+        fputcsv($out, ['ID','User','Action','Module','Description','IP','Date']);
+        foreach ($rows as $r) fputcsv($out, [$r['id'],$r['user_name'],$r['action'],$r['module']??'',$r['description']??'',$r['ip_address'],$r['created_at']]);
+        fclose($out); exit;
     }
 
 }
@@ -524,7 +496,7 @@ class AuditController extends Controller
 // =========================================================
 class ProfileController extends Controller
 {
-    protected Database $db;
+    private Database $db;
     public function __construct() { $this->db = Database::getInstance(); }
 
     public function index(): void
@@ -579,9 +551,6 @@ class ProfileController extends Controller
         $this->flash('success','Profile picture updated.');
         $this->redirect('/profile');
     }
-    public function show(): void
-    {
-        $this->update();
-    }
+    public function show(): void { $this->update(); }
 
 }

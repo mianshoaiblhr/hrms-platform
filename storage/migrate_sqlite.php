@@ -112,6 +112,7 @@ function migrate(PDO $db): void
         designation_id INTEGER,
         employment_type TEXT DEFAULT 'permanent',
         joining_date TEXT,
+        join_date TEXT,
         confirmation_date TEXT,
         termination_date TEXT,
         status TEXT DEFAULT 'active',
@@ -163,8 +164,8 @@ function migrate(PDO $db): void
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         employee_id INTEGER NOT NULL,
         leave_type_id INTEGER NOT NULL,
-        start_date TEXT NOT NULL,
-        end_date TEXT NOT NULL,
+        from_date TEXT NOT NULL,
+        to_date TEXT NOT NULL,
         days INTEGER NOT NULL,
         reason TEXT,
         attachment TEXT,
@@ -342,6 +343,7 @@ function migrate(PDO $db): void
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         date TEXT NOT NULL UNIQUE,
+        holiday_date TEXT,
         type TEXT DEFAULT 'public',
         created_at TEXT DEFAULT (datetime('now'))
     )");

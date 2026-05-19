@@ -304,7 +304,7 @@ class PayrollController extends Controller
         $components = $this->db->fetchAll(
             "SELECT pid.*, sc.name AS component_name, sc.code
              FROM payroll_item_details pid
-             JOIN salary_components sc ON pid.component_id = sc.id
+             JOIN payroll_items sc ON pid.component_id = sc.id
              WHERE pid.payroll_item_id = ?
              ORDER BY sc.type, sc.sort_order",
             [$item['id']]
@@ -367,7 +367,7 @@ class PayrollController extends Controller
             "SELECT ess.*, sc.name, sc.code, sc.type, sc.calculation_type, 
                     sc.percentage_of, sc.is_taxable, sc.is_statutory, sc.statutory_type, sc.sort_order
              FROM employee_salary_structure ess
-             JOIN salary_components sc ON ess.component_id = sc.id
+             JOIN payroll_items sc ON ess.component_id = sc.id
              WHERE ess.employee_id = ? AND ess.is_active = 1
                AND ess.effective_from <= ? 
                AND (ess.effective_to IS NULL OR ess.effective_to >= ?)
@@ -437,14 +437,14 @@ class PayrollController extends Controller
 
         // 11. Loan deductions
         $loanDeduction = $this->db->fetchColumn(
-            "SELECT IFNULL(SUM(monthly_installment), 0) FROM loans 
+            "SELECT IFNULL(SUM(monthly_installment), 0) FROM employee_loans 
              WHERE employee_id = ? AND status = 'active'",
             [$empId]
         ) ?? 0;
 
         // 12. Advance deductions
         $advanceDeduction = $this->db->fetchColumn(
-            "SELECT IFNULL(SUM(amount), 0) FROM advances 
+            "SELECT IFNULL(SUM(amount), 0) FROM salary_advances 
              WHERE employee_id = ? AND status = 'approved' AND recovered = 0
                AND MONTH(recovery_month) = ? AND YEAR(recovery_month) = ?",
             [$empId, $period['month'], $period['year']]

@@ -1,20 +1,10 @@
 #!/bin/bash
 set -e
 
-echo "==> HRMS starting..."
+PORT="${PORT:-8080}"
+echo "==> HRMS starting on port $PORT"
 
-# ── 1. Resolve PORT ───────────────────────────────────────────────────────────
-# Railway injects $PORT (usually 8080). Default to 80 if not set.
-APP_PORT="${PORT:-80}"
-echo "==> Port: $APP_PORT"
-
-# Write a clean ports.conf for this port
-echo "Listen ${APP_PORT}" > /etc/apache2/ports.conf
-
-# Inject the port into the VirtualHost config
-sed -i "s/__PORT__/${APP_PORT}/g" /etc/apache2/sites-available/000-default.conf
-
-# ── 2. Write .env ─────────────────────────────────────────────────────────────
+# Write .env from Railway environment variables
 cat > /var/www/html/.env <<EOF
 APP_NAME="${APP_NAME:-HRMS Enterprise}"
 APP_URL="${APP_URL:-http://localhost}"
@@ -30,11 +20,8 @@ DB_PASSWORD=${MYSQLPASSWORD:-${DB_PASSWORD:-}}
 
 MAIL_HOST=${MAIL_HOST:-smtp.gmail.com}
 MAIL_PORT=${MAIL_PORT:-587}
-MAIL_USER=${MAIL_USER:-}
-MAIL_PASS=${MAIL_PASS:-}
 MAIL_FROM=${MAIL_FROM:-noreply@hrms.local}
 MAIL_FROM_NAME="${MAIL_FROM_NAME:-HRMS Platform}"
-MAIL_ENCRYPTION=${MAIL_ENCRYPTION:-tls}
 
 SESSION_LIFETIME=${SESSION_LIFETIME:-1800}
 SESSION_SECURE=${SESSION_SECURE:-false}
@@ -43,17 +30,16 @@ COMPANY_TIMEZONE=Asia/Karachi
 EOF
 echo "==> .env written"
 
-# ── 3. Background DB schema import ───────────────────────────────────────────
+# Import DB schema in background (Apache/PHP starts immediately)
 (
   H="${MYSQLHOST:-${DB_HOST:-}}"
   P="${MYSQLPORT:-${DB_PORT:-3306}}"
-  D="${MYSQLDATABASE:-${DB_DATABASE:-}}"
+  D="${MYSQLDATABASE:-${DB_DATABASE:-hrms_db}}"
   U="${MYSQLUSER:-${DB_USERNAME:-}}"
   W="${MYSQLPASSWORD:-${DB_PASSWORD:-}}"
 
-  [ -z "$H" ] && echo "==> [bg] No DB host — skipping import" && exit 0
+  [ -z "$H" ] && echo "==> [bg] No DB host set, skipping" && exit 0
 
-  echo "==> [bg] Waiting for MySQL at $H:$P ..."
   for i in $(seq 1 40); do
     if mysqladmin ping -h "$H" -P "$P" -u "$U" -p"$W" --silent 2>/dev/null; then
       echo "==> [bg] MySQL ready"
@@ -64,18 +50,18 @@ echo "==> .env written"
         echo "==> [bg] Importing schema..."
         mysql -h "$H" -P "$P" -u "$U" -p"$W" "$D" \
           < /var/www/html/database/schema.sql 2>/dev/null \
-          && echo "==> [bg] ✅ Schema imported" \
-          || echo "==> [bg] ⚠ Import failed"
+          && echo "==> [bg] ✅ Done" \
+          || echo "==> [bg] ⚠ Failed"
       else
-        echo "==> [bg] DB already has $TABLES tables — skipping"
+        echo "==> [bg] Schema already present ($TABLES tables)"
       fi
       exit 0
     fi
+    echo "==> [bg] Waiting for MySQL... ($i/40)"
     sleep 3
   done
-  echo "==> [bg] MySQL not reachable after 40 attempts"
 ) &
 
-# ── 4. Start Apache (immediately, before DB is ready) ─────────────────────────
-echo "==> Apache starting on port ${APP_PORT}..."
-exec apache2-foreground
+# Start PHP built-in server — listens directly on $PORT, zero config needed
+echo "==> PHP server ready — http://0.0.0.0:${PORT}"
+exec php -S 0.0.0.0:${PORT} -t /var/www/html/public /var/www/html/public/router.php

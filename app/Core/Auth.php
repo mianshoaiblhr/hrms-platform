@@ -125,14 +125,14 @@ class Auth
 
         // Store session data
         Session::set('user_id',       $user['id']);
-        Session::set('username',      $user['username']);
-        Session::set('full_name',     $user['full_name']);
-        Session::set('email',         $user['email']);
-        Session::set('role_id',       $user['role_id']);
-        Session::set('role_slug',     $user['role_slug']);
-        Session::set('role_name',     $user['role_name']);
-        Session::set('department_id', $user['department_id']);
-        Session::set('avatar',        $user['avatar']);
+        Session::set('username',      $user['username'] ?? '');
+        Session::set('full_name',     $user['full_name'] ?? $user['name'] ?? $user['username'] ?? '');
+        Session::set('email',         $user['email'] ?? '');
+        Session::set('role_id',       $user['role_id'] ?? null);
+        Session::set('role_slug',     $user['role_slug'] ?? '');
+        Session::set('role_name',     $user['role_name'] ?? '');
+        Session::set('department_id', $user['department_id'] ?? null);
+        Session::set('avatar',        $user['avatar'] ?? null);
         Session::set('logged_in',     true);
         Session::set('login_time',    time());
         Session::set('last_activity', time());

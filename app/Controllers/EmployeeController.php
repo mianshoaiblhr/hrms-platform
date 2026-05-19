@@ -519,4 +519,10 @@ class EmployeeController extends Controller
             'departments' => $this->db->fetchColumn("SELECT COUNT(DISTINCT department_id) FROM employees WHERE deleted_at IS NULL AND employment_status = 'active'"),
         ];
     }
+    public function payslips(int $id): void
+    {
+        $this->requirePermission('payroll.view');
+        $this->redirect("/payroll?employee={$id}");
+    }
+
 }

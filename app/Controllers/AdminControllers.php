@@ -180,6 +180,20 @@ class RoleController extends Controller
         $this->flash('success','Permissions updated successfully.');
         $this->redirect('/roles');
     }
+    public function delete(int $id): void
+    {
+        $this->requirePermission('roles.delete');
+        $this->verifyCsrf();
+        $role = $this->db->fetchOne("SELECT * FROM roles WHERE id = ?", [$id]);
+        if (!$role || $role['is_system']) {
+            $this->flash('error', 'Cannot delete system roles.');
+            $this->redirect('/roles');
+        }
+        $this->db->update('roles', ['deleted_at' => date('Y-m-d H:i:s')], ['id' => $id]);
+        $this->flash('success', 'Role deleted.');
+        $this->redirect('/roles');
+    }
+
 }
 
 // =========================================================
@@ -275,11 +289,56 @@ class SettingsController extends Controller
         if ($exists) { $this->db->update('system_configs', ['config_value'=>$value,'updated_at'=>date('Y-m-d H:i:s')], 'config_group=? AND config_key=?', [$group,$key]); }
         else { $this->db->insert('system_configs', ['config_group'=>$group,'config_key'=>$key,'config_value'=>$value,'created_at'=>date('Y-m-d H:i:s')]); }
     }
+    public function company(): void
+    {
+        $this->requirePermission('settings.company');
+        $this->index(); // handled by main index with tab
+    }
+
+    public function backup(): void
+    {
+        $this->requirePermission('settings.system');
+        $this->json(['success' => true, 'message' => 'Backup feature coming soon']);
+    }
+
+    public function security(): void
+    {
+        $this->requirePermission('settings.system');
+        $this->index();
+    }
+
+    public function shifts(): void
+    {
+        $this->requirePermission('settings.view');
+        $this->index();
+    }
+
 }
 
 // =========================================================
 // Report Controller
 // =========================================================
+
+    public function employees(): void
+    {
+        $this->requirePermission('reports.employees');
+        $departments = $this->db->fetchAll("SELECT id, name FROM departments WHERE deleted_at IS NULL ORDER BY name");
+        $this->view('reports/payroll', ['report' => null, 'departments' => $departments, 'filters' => []]);
+    }
+
+    public function generate(): void
+    {
+        $this->requirePermission('reports.view');
+        $type = $this->input('type', 'payroll');
+        $this->redirect("/reports/{$type}");
+    }
+
+    public function leaves(): void
+    {
+        $this->requirePermission('reports.leaves');
+        $this->view('reports/payroll', ['report' => null, 'departments' => [], 'filters' => []]);
+    }
+
 class ReportController extends Controller
 {
     private Database $db;
@@ -443,6 +502,21 @@ class AuditController extends Controller
         );
         $this->view('audit/login_logs', compact('logs'));
     }
+    public function export(): void
+    {
+        $this->requirePermission('audit.view');
+        header('Content-Type: text/csv');
+        header('Content-Disposition: attachment; filename="audit_log_' . date('Y-m-d') . '.csv"');
+        $logs = $this->db->fetchAll("SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 10000");
+        $out = fopen('php://output', 'w');
+        fputcsv($out, ['ID','User','Action','Module','Record ID','Description','IP','Date']);
+        foreach ($logs as $l) {
+            fputcsv($out, [$l['id'],$l['user_name'],$l['action'],$l['module'] ?? '',$l['record_id'],$l['description'] ?? '',$l['ip_address'],$l['created_at']]);
+        }
+        fclose($out);
+        exit;
+    }
+
 }
 
 // =========================================================
@@ -505,4 +579,9 @@ class ProfileController extends Controller
         $this->flash('success','Profile picture updated.');
         $this->redirect('/profile');
     }
+    public function show(): void
+    {
+        $this->update();
+    }
+
 }

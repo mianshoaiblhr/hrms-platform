@@ -178,20 +178,21 @@ function migrate(PDO $db): void
     $db->exec("CREATE TABLE IF NOT EXISTS attendance (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         employee_id INTEGER NOT NULL,
-        date TEXT NOT NULL,
-        attendance_date TEXT,
+        date TEXT,
+        attendance_date TEXT NOT NULL DEFAULT (date('now')),
         check_in TEXT,
         check_out TEXT,
         working_hours REAL,
         overtime_hours REAL DEFAULT 0,
         late_minutes INTEGER DEFAULT 0,
         status TEXT DEFAULT 'present',
+        source TEXT DEFAULT 'manual',
         notes TEXT,
         created_by INTEGER,
         created_at TEXT DEFAULT (datetime('now')),
         updated_at TEXT DEFAULT (datetime('now')),
         deleted_at TEXT,
-        UNIQUE(employee_id, date)
+        UNIQUE(employee_id, attendance_date)
     )");
 
     $db->exec("CREATE TABLE IF NOT EXISTS payroll_periods (
@@ -296,9 +297,17 @@ function migrate(PDO $db): void
         user_name TEXT,
         user_role TEXT,
         action TEXT NOT NULL,
+        module TEXT,
         table_name TEXT,
         record_id INTEGER,
+        record_type TEXT,
         changes TEXT,
+        old_values TEXT,
+        new_values TEXT,
+        description TEXT,
+        status TEXT DEFAULT 'success',
+        url TEXT,
+        method TEXT,
         ip_address TEXT,
         user_agent TEXT,
         created_at TEXT DEFAULT (datetime('now'))
@@ -308,8 +317,10 @@ function migrate(PDO $db): void
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER,
         username TEXT,
+        username_attempt TEXT,
         ip_address TEXT,
         user_agent TEXT,
+        session_id TEXT,
         status TEXT DEFAULT 'success',
         failure_reason TEXT,
         created_at TEXT DEFAULT (datetime('now'))

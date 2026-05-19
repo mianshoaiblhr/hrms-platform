@@ -153,6 +153,29 @@ class AttendanceController extends Controller
 // =========================================================
 // Leave Controller
 // =========================================================
+    public function mark(): void
+    {
+        $this->requirePermission('attendance.create');
+        $this->store();
+    }
+
+    public function monthly(): void
+    {
+        $this->requirePermission('attendance.view');
+        $month = $this->input('month', date('Y-m'));
+        $deptId = $this->input('dept', '');
+        $data = ['month' => $month, 'dept' => $deptId, 'rows' => []];
+        $this->view('attendance/index', $data);
+    }
+
+    public function report(): void
+    {
+        $this->requirePermission('attendance.view');
+        $this->index();
+    }
+
+}
+
 class LeaveController extends Controller
 {
     private Database $db;
@@ -350,6 +373,24 @@ class LeaveController extends Controller
         );
         $this->view('leaves/calendar', compact('leaves','year','month'));
     }
+    public function cancel(int $id): void
+    {
+        $this->verifyCsrf();
+        $leave = $this->db->fetchOne("SELECT * FROM leave_applications WHERE id = ?", [$id]);
+        if (!$leave) { $this->flash('error', 'Leave not found.'); $this->redirect('/leaves'); }
+        if ($leave['status'] !== 'pending') { $this->flash('error', 'Only pending leaves can be cancelled.'); $this->redirect('/leaves'); }
+        $this->db->update('leave_applications', ['status' => 'cancelled', 'updated_at' => date('Y-m-d H:i:s')], ['id' => $id]);
+        $this->auditLog('cancel', 'leave_applications', $id);
+        $this->flash('success', 'Leave application cancelled.');
+        $this->redirect('/leaves');
+    }
+
+    public function show(int $id): void
+    {
+        $this->requirePermission('leaves.view');
+        $this->index();
+    }
+
 }
 
 // =========================================================
@@ -450,4 +491,17 @@ class DocumentController extends Controller
         AuditLogger::log('document.delete', 'documents', $id);
         $this->json(['success' => true, 'message' => 'Document deleted.']);
     }
+    public function show(int $id): void
+    {
+        $this->requirePermission('documents.view');
+        $this->index();
+    }
+
+}
+
+
+// ── Additional AttendanceController methods ───────────────────────────────
+namespace App\Controllers;
+class AttendanceController_Extra {
+    // Stub — avoids route 404 until full implementation
 }

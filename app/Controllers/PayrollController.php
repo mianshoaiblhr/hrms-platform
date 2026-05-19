@@ -558,4 +558,27 @@ class PayrollController extends Controller
 
         return $count;
     }
+    public function disburse(int $id): void
+    {
+        $this->requirePermission('payroll.approve');
+        $this->verifyCsrf();
+        $this->db->update('payroll_periods', ['status' => 'paid'], ['id' => $id]);
+        $this->flash('success', 'Payroll marked as disbursed.');
+        $this->redirect('/payroll');
+    }
+
+    public function export(int $id): void
+    {
+        $this->requirePermission('payroll.view');
+        header('Content-Type: text/csv');
+        header('Content-Disposition: attachment; filename="payroll_' . $id . '.csv"');
+        $rows = $this->db->fetchAll("SELECT * FROM payroll_details WHERE payroll_period_id = ?", [$id]);
+        $out = fopen('php://output', 'w');
+        fputcsv($out, ['Employee','Basic','Allowances','Gross','Tax','EOBI','Net']);
+        foreach ($rows as $r) {
+            fputcsv($out, [$r['employee_id'], $r['basic_salary'], $r['total_allowances'] ?? 0, $r['gross_salary'], $r['income_tax'], $r['eobi_employee'], $r['net_salary']]);
+        }
+        fclose($out); exit;
+    }
+
 }

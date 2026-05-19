@@ -72,6 +72,9 @@ try {
         \$ins->execute(['Super Admin','admin','admin@hrms.local',\$hash,\$roleId]);
         echo 'Admin user created' . PHP_EOL;
     }
+    // Clear any lockout from failed attempts
+    \$pdo->exec("UPDATE users SET login_attempts=0, locked_until=NULL WHERE username='admin'");
+    echo 'Lockout cleared' . PHP_EOL;
     echo 'Login: admin / Admin@123' . PHP_EOL;
 } catch (Exception \$e) {
     echo 'Admin setup error: ' . \$e->getMessage() . PHP_EOL;

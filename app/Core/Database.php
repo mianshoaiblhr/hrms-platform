@@ -183,6 +183,22 @@ class Database
         return "{$fn}('now', '{$sign}{$n} {$u}')";
     }
 
+    public function fetchAll(string $sql, array $params = []): array
+    {
+        return $this->query($sql, $params)->fetchAll();
+    }
+
+    public function fetchOne(string $sql, array $params = []): ?array
+    {
+        $row = $this->query($sql, $params)->fetch();
+        return $row ?: null;
+    }
+
+    public function fetchColumn(string $sql, array $params = []): mixed
+    {
+        return $this->query($sql, $params)->fetchColumn();
+    }
+
     public function insert(string $table, array $data): int
     {
         $cols = implode(', ', array_keys($data));

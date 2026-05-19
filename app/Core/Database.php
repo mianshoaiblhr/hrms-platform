@@ -85,17 +85,74 @@ class Database
 
     public function query(string $sql, array $params = []): \PDOStatement
     {
-        // Translate MySQL-isms to SQLite when needed
         if (self::$driver === 'sqlite') {
-            $sql = str_replace(
-                ['`', 'NOW()', 'UNIX_TIMESTAMP()', ' LIMIT ', 'AUTO_INCREMENT'],
-                ['"', "datetime('now')", "strftime('%s','now')", ' LIMIT ', 'AUTOINCREMENT'],
-                $sql
-            );
+            $sql = self::toSQLite($sql);
         }
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($params);
         return $stmt;
+    }
+
+    /**
+     * Translate MySQL-specific SQL to SQLite-compatible SQL.
+     * Handles: DATE_SUB, DATE_ADD, DATE_FORMAT, CURDATE(), NOW(),
+     *          UNIX_TIMESTAMP(), backtick identifiers.
+     */
+    private static function toSQLite(string $sql): string
+    {
+        // 1. DATE_FORMAT(expr, 'fmt') → strftime('fmt', expr)
+        //    Must run before DATE_ADD/DATE_SUB so nested calls resolve correctly
+        $sql = preg_replace_callback(
+            "/DATE_FORMAT\s*\(\s*(.+?)\s*,\s*'([^']*)'\s*\)/i",
+            function ($m) {
+                $expr = self::resolveDateExpr(trim($m[1]));
+                $fmt  = str_replace('%i', '%M', $m[2]); // MySQL %i = minutes → SQLite %M
+                return "strftime('{$fmt}', {$expr})";
+            },
+            $sql
+        );
+
+        // 2. DATE_SUB(expr, INTERVAL n UNIT) → datetime/date('now', '-n units')
+        $sql = preg_replace_callback(
+            '/DATE_SUB\s*\(\s*(.+?)\s*,\s*INTERVAL\s+(\d+)\s+(SECOND|MINUTE|HOUR|DAY|MONTH|YEAR)S?\s*\)/i',
+            fn($m) => self::intervalExpr($m[1], '-', $m[2], $m[3]),
+            $sql
+        );
+
+        // 3. DATE_ADD(expr, INTERVAL n UNIT) → datetime/date('now', '+n units')
+        $sql = preg_replace_callback(
+            '/DATE_ADD\s*\(\s*(.+?)\s*,\s*INTERVAL\s+(\d+)\s+(SECOND|MINUTE|HOUR|DAY|MONTH|YEAR)S?\s*\)/i',
+            fn($m) => self::intervalExpr($m[1], '+', $m[2], $m[3]),
+            $sql
+        );
+
+        // 4. Simple replacements (case-insensitive, longest first)
+        $search  = ['UNIX_TIMESTAMP()', 'NOW()', 'CURDATE()'];
+        $replace = ["strftime('%s','now')", "datetime('now')", "date('now')"];
+        foreach ($search as $i => $s) {
+            $sql = str_ireplace($s, $replace[$i], $sql);
+        }
+
+        return $sql;
+    }
+
+    private static function resolveDateExpr(string $expr): string
+    {
+        if (stripos($expr, 'CURDATE()') !== false) return str_ireplace('CURDATE()', 'now', $expr);
+        if (stripos($expr, 'NOW()')    !== false) return str_ireplace('NOW()',    'now', $expr);
+        // bare column name → pass through
+        return $expr;
+    }
+
+    private static function intervalExpr(string $base, string $sign, string $n, string $unit): string
+    {
+        $base = trim($base);
+        // Choose date() vs datetime() based on precision
+        $useDateOnly = in_array(strtoupper($unit), ['DAY','MONTH','YEAR'])
+                    && stripos($base, 'CURDATE') !== false;
+        $fn   = $useDateOnly ? 'date' : 'datetime';
+        $mod  = "{$sign}{$n} " . strtolower($unit) . 's';
+        return "{$fn}('now', '{$mod}')";
     }
 
     public function fetchAll(string $sql, array $params = []): array

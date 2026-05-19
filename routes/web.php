@@ -11,6 +11,21 @@ use App\Middleware\MaintenanceMiddleware;
 
 $router = new Router();
 
+
+// Status / health check — no auth required
+$router->get('/status', function() {
+    ob_start();
+    require dirname(__DIR__) . '/public/status.php';
+    ob_end_flush();
+    exit;
+});
+
+$router->get('/ping', function() {
+    header('Content-Type: text/plain');
+    echo 'OK';
+    exit;
+});
+
 // ============================================================
 // PUBLIC ROUTES (Guest only)
 // ============================================================

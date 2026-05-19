@@ -1,23 +1,32 @@
 #!/bin/bash
 set -e
 
-ENV_FILE="/var/www/html/.env"
-
 echo "==> HRMS Enterprise — Starting up..."
 
-# Write .env from environment variables (Railway injects these)
-cat > "$ENV_FILE" <<EOF
+# ── 1. Resolve PORT (Railway injects $PORT, default to 80) ──────────────────
+PORT="${PORT:-80}"
+echo "==> Configuring Apache on port $PORT"
+
+# Update ports.conf
+sed -i "s/Listen 80/Listen $PORT/g" /etc/apache2/ports.conf
+sed -i "s/Listen 443/Listen 443/g" /etc/apache2/ports.conf 2>/dev/null || true
+
+# Update VirtualHost port placeholder set at build time
+sed -i "s/HRMS_PORT/$PORT/g" /etc/apache2/sites-available/000-default.conf
+
+# ── 2. Write .env from Railway environment variables ────────────────────────
+cat > /var/www/html/.env <<EOF
 APP_NAME="${APP_NAME:-HRMS Enterprise}"
 APP_URL="${APP_URL:-http://localhost}"
 APP_DEBUG=${APP_DEBUG:-false}
 APP_ENV=${APP_ENV:-production}
 APP_KEY=${APP_KEY:-$(php -r "echo bin2hex(random_bytes(16));")}
 
-DB_HOST=${MYSQLHOST:-${DB_HOST:-127.0.0.1}}
-DB_PORT=${MYSQLPORT:-${DB_PORT:-3306}}
-DB_DATABASE=${MYSQLDATABASE:-${DB_DATABASE:-hrms_db}}
-DB_USERNAME=${MYSQLUSER:-${DB_USERNAME:-root}}
-DB_PASSWORD=${MYSQLPASSWORD:-${DB_PASSWORD:-}}
+DB_HOST=${MYSQLHOST:-${RAILWAY_MYSQL_HOST:-${DB_HOST:-127.0.0.1}}}
+DB_PORT=${MYSQLPORT:-${RAILWAY_MYSQL_PORT:-${DB_PORT:-3306}}}
+DB_DATABASE=${MYSQLDATABASE:-${RAILWAY_MYSQL_DATABASE:-${DB_DATABASE:-hrms_db}}}
+DB_USERNAME=${MYSQLUSER:-${RAILWAY_MYSQL_USER:-${DB_USERNAME:-root}}}
+DB_PASSWORD=${MYSQLPASSWORD:-${RAILWAY_MYSQL_PASSWORD:-${DB_PASSWORD:-}}}
 
 MAIL_HOST=${MAIL_HOST:-smtp.gmail.com}
 MAIL_PORT=${MAIL_PORT:-587}
@@ -29,51 +38,46 @@ MAIL_ENCRYPTION=${MAIL_ENCRYPTION:-tls}
 
 SESSION_LIFETIME=${SESSION_LIFETIME:-1800}
 SESSION_SECURE=${SESSION_SECURE:-false}
-
 UPLOAD_MAX_SIZE=10485760
 COMPANY_TIMEZONE=Asia/Karachi
 EOF
-
 echo "==> .env written"
 
-# Start Apache immediately (don't block on DB)
-echo "==> Starting Apache..."
-apache2ctl start 2>/dev/null || true
-
-# Try DB import in background so healthcheck can pass immediately
+# ── 3. Import DB schema in background (does not block Apache startup) ────────
 (
-  DB_HOST_VAL="${MYSQLHOST:-${DB_HOST:-127.0.0.1}}"
-  DB_PORT_VAL="${MYSQLPORT:-${DB_PORT:-3306}}"
-  DB_NAME_VAL="${MYSQLDATABASE:-${DB_DATABASE:-hrms_db}}"
-  DB_USER_VAL="${MYSQLUSER:-${DB_USERNAME:-root}}"
-  DB_PASS_VAL="${MYSQLPASSWORD:-${DB_PASSWORD:-}}"
+  DB_HOST="${MYSQLHOST:-${RAILWAY_MYSQL_HOST:-${DB_HOST:-127.0.0.1}}}"
+  DB_PORT="${MYSQLPORT:-${RAILWAY_MYSQL_PORT:-${DB_PORT:-3306}}}"
+  DB_NAME="${MYSQLDATABASE:-${RAILWAY_MYSQL_DATABASE:-${DB_DATABASE:-hrms_db}}}"
+  DB_USER="${MYSQLUSER:-${RAILWAY_MYSQL_USER:-${DB_USERNAME:-root}}}"
+  DB_PASS="${MYSQLPASSWORD:-${RAILWAY_MYSQL_PASSWORD:-${DB_PASSWORD:-}}}"
 
-  echo "==> [background] Waiting for MySQL at $DB_HOST_VAL:$DB_PORT_VAL..."
+  echo "==> [bg] Waiting for MySQL at $DB_HOST:$DB_PORT..."
   for i in $(seq 1 40); do
-    if php -r "new PDO('mysql:host=$DB_HOST_VAL;port=$DB_PORT_VAL;dbname=$DB_NAME_VAL', '$DB_USER_VAL', '$DB_PASS_VAL');" 2>/dev/null; then
-      echo "==> [background] MySQL is ready!"
+    if mysqladmin ping -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASS" --silent 2>/dev/null; then
+      echo "==> [bg] MySQL ready after ${i} attempts"
       break
     fi
-    echo "    Attempt $i/40 — waiting 3s..."
     sleep 3
   done
 
-  TABLE_COUNT=$(php -r "
-  try {
-    \$pdo = new PDO('mysql:host=$DB_HOST_VAL;port=$DB_PORT_VAL;dbname=$DB_NAME_VAL', '$DB_USER_VAL', '$DB_PASS_VAL');
-    echo \$pdo->query('SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=\"$DB_NAME_VAL\"')->fetchColumn();
-  } catch(Exception \$e) { echo 0; }
-  " 2>/dev/null || echo 0)
+  # Check if schema already imported
+  TABLE_COUNT=$(mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASS" \
+    -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$DB_NAME';" \
+    --skip-column-names 2>/dev/null || echo "0")
 
-  if [ "$TABLE_COUNT" -lt "5" ]; then
-    echo "==> [background] Importing database schema..."
-    mysql -h "$DB_HOST_VAL" -P "$DB_PORT_VAL" -u "$DB_USER_VAL" -p"$DB_PASS_VAL" "$DB_NAME_VAL" < /var/www/html/database/schema.sql && \
-      echo "==> [background] ✅ Schema imported!" || \
-      echo "==> [background] ⚠️  Schema import failed"
+  if [ "${TABLE_COUNT:-0}" -lt 5 ]; then
+    echo "==> [bg] Importing schema ($TABLE_COUNT tables found)..."
+    mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" \
+      < /var/www/html/database/schema.sql 2>/dev/null \
+      && echo "==> [bg] ✅ Schema imported — $(mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASS" \
+           -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$DB_NAME';" \
+           --skip-column-names 2>/dev/null) tables created" \
+      || echo "==> [bg] ⚠ Schema import failed — check DB credentials"
   else
-    echo "==> [background] DB already has $TABLE_COUNT tables, skipping"
+    echo "==> [bg] DB already has $TABLE_COUNT tables, skipping import"
   fi
 ) &
 
-# Keep Apache in foreground
+# ── 4. Start Apache in foreground (healthcheck can hit /health.php immediately) ──
+echo "==> Starting Apache on port $PORT..."
 exec apache2-foreground

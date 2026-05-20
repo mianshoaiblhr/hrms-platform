@@ -37,7 +37,7 @@ class DashboardController extends Controller
 
         // ── KPI stats ──────────────────────────────────────────────────────
         $stats = [
-            'total_employees' => $safeCount("SELECT COUNT(*) FROM employees WHERE status='active' AND deleted_at IS NULL"),
+            'total_employees' => $safeCount("SELECT COUNT(*) FROM employees WHERE employment_status='active' AND deleted_at IS NULL"),
             'pending_leaves'  => $safeCount("SELECT COUNT(*) FROM leave_applications WHERE status='pending'"),
             'today_present'   => $safeCount("SELECT COUNT(*) FROM attendance WHERE attendance_date=CURDATE() AND status='present' AND deleted_at IS NULL"),
             'today_absent'    => $safeCount("SELECT COUNT(*) FROM attendance WHERE attendance_date=CURDATE() AND status='absent' AND deleted_at IS NULL"),

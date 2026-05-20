@@ -242,7 +242,7 @@ class SettingsController extends Controller
     {
         $this->requirePermission('settings.view');
         $designations = $this->db->fetchAll("SELECT des.*,d.name AS dept_name FROM designations des LEFT JOIN departments d ON des.department_id=d.id WHERE des.deleted_at IS NULL ORDER BY des.title");
-        $departments  = $this->db->fetchAll("SELECT id,name FROM departments WHERE status='active' AND deleted_at IS NULL ORDER BY name");
+        $departments  = $this->db->fetchAll("SELECT id,name FROM departments WHERE is_active=1 AND deleted_at IS NULL ORDER BY name");
         $this->view('settings/designations', compact('designations','departments'));
     }
 
@@ -464,8 +464,8 @@ class AuditController extends Controller
         $whereStr = implode(' AND ', $where);
         $base = "FROM audit_logs al LEFT JOIN users u ON al.user_id=u.id LEFT JOIN employees e ON u.employee_id=e.id WHERE $whereStr";
         $logs = $this->db->paginate(
-            "SELECT al.*, u.username, (CONCAT(e.first_name,' ',e.last_name)) AS full_name $base ORDER BY al.created_at DESC",
-            "SELECT COUNT(*) $base", $params, (int)$this->input('page',1)
+            "SELECT...",
+            $params, (int)$this->input('page',1)
         );
         $users = $this->db->fetchAll("SELECT u.id, u.username FROM users u WHERE u.deleted_at IS NULL ORDER BY u.username");
         $this->view('audit/index', compact('logs','filters','users'));
@@ -477,7 +477,7 @@ class AuditController extends Controller
         $page = (int)$this->input('page',1);
         $logs = $this->db->paginate(
             "SELECT ll.*, u.username FROM login_logs ll LEFT JOIN users u ON ll.user_id=u.id ORDER BY ll.created_at DESC",
-            "SELECT COUNT(*) FROM login_logs", [], $page
+            [], $page
         );
         $this->view('audit/login_logs', compact('logs'));
     }

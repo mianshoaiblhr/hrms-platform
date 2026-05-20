@@ -30,8 +30,8 @@ class AttendanceController extends Controller
         $page    = (int)$this->input('page', 1);
         $model   = new \App\Models\Attendance();
         $data    = $model->listWithEmployee($filters, $page);
-        $departments = $this->db->fetchAll("SELECT id,name FROM departments WHERE status='active' AND deleted_at IS NULL ORDER BY name");
-        $employees   = $this->db->fetchAll("SELECT id,(CONCAT(first_name,' ',last_name)) AS name FROM employees WHERE status='active' AND deleted_at IS NULL ORDER BY first_name");
+        $departments = $this->db->fetchAll("SELECT id,name FROM departments WHERE is_active=1 AND deleted_at IS NULL ORDER BY name");
+        $employees   = $this->db->fetchAll("SELECT id,(CONCAT(first_name,' ',last_name)) AS name FROM employees WHERE employment_status='active' AND deleted_at IS NULL ORDER BY first_name");
         $this->view('attendance/index', compact('data','filters','departments','employees'));
     }
 
@@ -174,10 +174,10 @@ class LeaveController extends Controller
         $page  = (int)$this->input('page', 1);
         $model = new \App\Models\Leave();
         $data  = $model->listWithDetails($filters, $page);
-        $leaveTypes  = $this->db->fetchAll("SELECT * FROM leave_types WHERE status='active' ORDER BY name");
-        $departments = $this->db->fetchAll("SELECT id,name FROM departments WHERE status='active' AND deleted_at IS NULL ORDER BY name");
+        $leaveTypes  = $this->db->fetchAll("SELECT * FROM leave_types WHERE is_active=1 ORDER BY name");
+        $departments = $this->db->fetchAll("SELECT id,name FROM departments WHERE is_active=1 AND deleted_at IS NULL ORDER BY name");
         $employees   = Auth::getInstance()->can('leaves.view_all')
-            ? $this->db->fetchAll("SELECT id,(CONCAT(first_name,' ',last_name)) AS name FROM employees WHERE status='active' AND deleted_at IS NULL ORDER BY first_name")
+            ? $this->db->fetchAll("SELECT id,(CONCAT(first_name,' ',last_name)) AS name FROM employees WHERE employment_status='active' AND deleted_at IS NULL ORDER BY first_name")
             : [];
         $this->view('leaves/index', compact('data','filters','leaveTypes','departments','employees'));
     }
@@ -187,7 +187,7 @@ class LeaveController extends Controller
         $user = Auth::getInstance()->user();
         $employeeId = (int)$user['employee_id'];
         if (!$employeeId) { $this->abort(403, 'No employee profile linked.'); }
-        $leaveTypes = $this->db->fetchAll("SELECT * FROM leave_types WHERE status='active' ORDER BY name");
+        $leaveTypes = $this->db->fetchAll("SELECT * FROM leave_types WHERE is_active=1 ORDER BY name");
         $balances = $this->db->fetchAll(
             "SELECT lb.*, lt.name FROM leave_balances lb JOIN leave_types lt ON lb.leave_type_id=lt.id WHERE lb.employee_id=? AND lb.year=strftime('%Y','now')",
             [$employeeId]
@@ -317,8 +317,8 @@ class LeaveController extends Controller
     public function balances(): void
     {
         $this->requirePermission('leaves.view');
-        $departments = $this->db->fetchAll("SELECT id,name FROM departments WHERE status='active' AND deleted_at IS NULL ORDER BY name");
-        $leaveTypes  = $this->db->fetchAll("SELECT * FROM leave_types WHERE status='active' ORDER BY name");
+        $departments = $this->db->fetchAll("SELECT id,name FROM departments WHERE is_active=1 AND deleted_at IS NULL ORDER BY name");
+        $leaveTypes  = $this->db->fetchAll("SELECT * FROM leave_types WHERE is_active=1 ORDER BY name");
         $year = (int)$this->input('year', date('Y'));
         $dept = (int)$this->input('dept', 0);
         $baseQ = "FROM leave_balances lb

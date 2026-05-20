@@ -225,7 +225,7 @@ class Department extends Model
     protected array $fillable = ['name','code','parent_id','manager_id','description','status'];
     public function getAllActive(): array
     {
-        return $this->db->fetchAll("SELECT * FROM departments WHERE status='active' AND deleted_at IS NULL ORDER BY name");
+        return $this->db->fetchAll("SELECT * FROM departments WHERE is_active=1 AND deleted_at IS NULL ORDER BY name");
     }
 }
 

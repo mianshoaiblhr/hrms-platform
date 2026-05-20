@@ -242,7 +242,7 @@ class AdvanceController extends Controller
             $params, $page, 25
         );
 
-        $employees = $db->fetchAll("SELECT id, employee_code, first_name, last_name FROM employees WHERE status='active' AND deleted_at IS NULL ORDER BY first_name");
+        $employees = $db->fetchAll("SELECT id, employee_code, first_name, last_name FROM employees WHERE employment_status='active' AND deleted_at IS NULL ORDER BY first_name");
         $stats     = [
             'pending'  => $db->fetchColumn("SELECT COUNT(*) FROM salary_advances WHERE status='pending' AND deleted_at IS NULL"),
             'approved' => $db->fetchColumn("SELECT COUNT(*) FROM salary_advances WHERE status='approved' AND deleted_at IS NULL"),
@@ -351,7 +351,7 @@ class LoanController extends Controller
             $params, $page, 25
         );
 
-        $employees = $db->fetchAll("SELECT id, employee_code, first_name, last_name FROM employees WHERE status='active' AND deleted_at IS NULL ORDER BY first_name");
+        $employees = $db->fetchAll("SELECT id, employee_code, first_name, last_name FROM employees WHERE employment_status='active' AND deleted_at IS NULL ORDER BY first_name");
         $this->view('loans/index', compact('data', 'filters', 'employees'));
     }
 

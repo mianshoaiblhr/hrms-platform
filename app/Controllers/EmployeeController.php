@@ -174,7 +174,7 @@ class EmployeeController extends Controller
 
         $departments  = $this->db->fetchAll("SELECT id, name FROM departments WHERE is_active = 1 ORDER BY name");
         $designations = $this->db->fetchAll("SELECT id, title, department_id FROM designations WHERE is_active = 1 ORDER BY title");
-        $managers     = $this->db->fetchAll("SELECT id, CONCAT(first_name, ' ', last_name) AS name FROM employees WHERE status = 'active' AND deleted_at IS NULL ORDER BY first_name");
+        $managers     = $this->db->fetchAll("SELECT id, CONCAT(first_name, ' ', last_name) AS name FROM employees WHERE employment_status='active' AND deleted_at IS NULL ORDER BY first_name");
         $shifts       = $this->db->fetchAll("SELECT id, name FROM shifts WHERE is_active = 1");
 
         $this->view('employees/create', [
@@ -348,7 +348,7 @@ class EmployeeController extends Controller
 
         $departments  = $this->db->fetchAll("SELECT id, name FROM departments WHERE is_active = 1 ORDER BY name");
         $designations = $this->db->fetchAll("SELECT id, title, department_id FROM designations WHERE is_active = 1 ORDER BY title");
-        $managers     = $this->db->fetchAll("SELECT id, CONCAT(first_name, ' ', last_name) AS name FROM employees WHERE status = 'active' AND id != ? AND deleted_at IS NULL ORDER BY first_name", [$id]);
+        $managers     = $this->db->fetchAll("SELECT id, CONCAT(first_name, ' ', last_name) AS name FROM employees WHERE employment_status='active' AND id != ? AND deleted_at IS NULL ORDER BY first_name", [$id]);
 
         $this->view('employees/edit', compact('employee', 'departments', 'designations', 'managers') + [
             'title'      => 'Edit Employee',

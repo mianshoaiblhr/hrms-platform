@@ -26,7 +26,7 @@ define('UPLOAD_PATH', STORAGE_PATH . DS . 'uploads');
 // ERROR HANDLING
 // ==============================================================
 error_reporting(E_ALL);
-ini_set('display_errors', '0');
+ini_set('display_errors', '1');
 ini_set('log_errors', '1');
 ini_set('log_errors', '1');
 ini_set('error_log', STORAGE_PATH . DS . 'logs' . DS . 'php_error.log');
@@ -143,6 +143,11 @@ try {
 } catch (\Throwable $e) {
     error_log('[ORBIT HRMS] ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
     http_response_code(500);
-    $errView = RESOURCE_PATH . DS . 'views' . DS . 'errors' . DS . '500.php';
-    file_exists($errView) ? include $errView : print('<h1>Server Error</h1><a href="/">Home</a>');
+    echo '<div style="font-family:monospace;padding:2rem;background:#0f172a;color:#e2e8f0;min-height:100vh">';
+    echo '<h2 style="color:#f87171">&#9888; ORBIT HRMS Error</h2>';
+    echo '<p style="color:#fbbf24;font-size:1.1em">' . htmlspecialchars($e->getMessage()) . '</p>';
+    echo '<p style="color:#94a3b8">' . htmlspecialchars(str_replace(ROOT_PATH,'',$e->getFile())) . ' : line ' . $e->getLine() . '</p>';
+    echo '<pre style="background:#1e293b;padding:1rem;border-radius:8px;overflow:auto;font-size:.8em;color:#7dd3fc">'
+        . htmlspecialchars($e->getTraceAsString()) . '</pre>';
+    echo '</div>';
 }

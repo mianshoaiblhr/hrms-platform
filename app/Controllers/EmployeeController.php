@@ -40,13 +40,13 @@ class EmployeeController extends Controller
         if (!in_array($sortDir, ['ASC', 'DESC'])) $sortDir = 'DESC';
 
         $sql = "SELECT e.id, e.employee_code, e.first_name, e.last_name, e.cnic,
-                       e.mobile, e.join_date, e.status, e.basic_salary,
+                       e.mobile, e.join_date, e.employment_status AS status, e.basic_salary,
                        e.profile_photo, e.contract_type,
                        d.name AS department_name, des.title AS designation,
                        u.email, u.last_login_at
                 FROM employees e
-                JOIN departments d ON e.department_id = d.id
-                JOIN designations des ON e.designation_id = des.id
+                LEFT JOIN departments d ON e.department_id = d.id
+                LEFT JOIN designations des ON e.designation_id = des.id
                 LEFT JOIN users u ON e.user_id = u.id
                 WHERE e.deleted_at IS NULL";
 
@@ -60,20 +60,21 @@ class EmployeeController extends Controller
             $sql    .= " AND e.department_id = ?";
             $params[] = $department;
         }
-        if ($status) {
-            $sql    .= " AND e.status = ?";
+        if ($status && $status !== 'all') {
+            $sql    .= " AND e.employment_status = ?";
             $params[] = $status;
         }
 
         $sql .= " ORDER BY {$sortBy} {$sortDir}";
 
-        $employees   = $this->paginate($sql, $params, 20);
+        $page        = (int)$this->input('page', 1);
+        $employees   = $this->db->paginate($sql, $params, $page, 20);
         $departments = $this->db->fetchAll("SELECT id, name FROM departments WHERE is_active = 1 ORDER BY name");
         $stats       = $this->getEmployeeStats();
 
-        $this->view('employees.index', [
+        $this->view('employees/index', [
             'title'       => 'Employee Management',
-            'employees'   => $employees,
+            'data'        => $employees,
             'departments' => $departments,
             'stats'       => $stats,
             'filters'     => compact('search', 'department', 'status'),
@@ -106,7 +107,7 @@ class EmployeeController extends Controller
         );
 
         if (!$employee) {
-            $this->abort(404, 'Employee not found.');
+            http_response_code(404); $this->view('errors/404'); return;
         }
 
         // Restrict: non-admin employees can only view their own profile
@@ -116,7 +117,7 @@ class EmployeeController extends Controller
                 [$this->auth->id()]
             );
             if ($myEmpId != $id) {
-                $this->abort(403, 'Access denied.');
+                http_response_code(403); $this->view('errors/403'); return;
             }
         }
 
@@ -158,7 +159,7 @@ class EmployeeController extends Controller
             [$id]
         );
 
-        $this->view('employees.show', compact(
+        $this->view('employees/show', compact(
             'employee', 'education', 'experience', 'promotions',
             'documents', 'leaveBalance', 'attendanceSummary'
         ) + ['title' => $employee['first_name'] . ' ' . $employee['last_name']]);
@@ -169,14 +170,14 @@ class EmployeeController extends Controller
     // --------------------------------------------------------
     public function create(): void
     {
-        $this->requirePermission('employees.create');
+        $this->requirePermission('employees/create');
 
         $departments  = $this->db->fetchAll("SELECT id, name FROM departments WHERE is_active = 1 ORDER BY name");
         $designations = $this->db->fetchAll("SELECT id, title, department_id FROM designations WHERE is_active = 1 ORDER BY title");
         $managers     = $this->db->fetchAll("SELECT id, CONCAT(first_name, ' ', last_name) AS name FROM employees WHERE status = 'active' AND deleted_at IS NULL ORDER BY first_name");
         $shifts       = $this->db->fetchAll("SELECT id, name FROM shifts WHERE is_active = 1");
 
-        $this->view('employees.create', [
+        $this->view('employees/create', [
             'title'        => 'Add New Employee',
             'departments'  => $departments,
             'designations' => $designations,
@@ -191,7 +192,7 @@ class EmployeeController extends Controller
     // --------------------------------------------------------
     public function store(): void
     {
-        $this->requirePermission('employees.create');
+        $this->requirePermission('employees/create');
         $this->verifyCsrf();
 
         $data = $this->getAllInput();
@@ -340,7 +341,7 @@ class EmployeeController extends Controller
     // --------------------------------------------------------
     public function edit(string $id): void
     {
-        $this->requirePermission('employees.edit');
+        $this->requirePermission('employees/edit');
 
         $employee     = $this->db->fetchOne("SELECT * FROM employees WHERE id = ? AND deleted_at IS NULL", [$id]);
         if (!$employee) $this->abort(404);
@@ -349,7 +350,7 @@ class EmployeeController extends Controller
         $designations = $this->db->fetchAll("SELECT id, title, department_id FROM designations WHERE is_active = 1 ORDER BY title");
         $managers     = $this->db->fetchAll("SELECT id, CONCAT(first_name, ' ', last_name) AS name FROM employees WHERE status = 'active' AND id != ? AND deleted_at IS NULL ORDER BY first_name", [$id]);
 
-        $this->view('employees.edit', compact('employee', 'departments', 'designations', 'managers') + [
+        $this->view('employees/edit', compact('employee', 'departments', 'designations', 'managers') + [
             'title'      => 'Edit Employee',
             'csrf_token' => Session::csrfToken(),
         ]);
@@ -360,7 +361,7 @@ class EmployeeController extends Controller
     // --------------------------------------------------------
     public function update(string $id): void
     {
-        $this->requirePermission('employees.edit');
+        $this->requirePermission('employees/edit');
         $this->verifyCsrf();
 
         $employee = $this->db->fetchOne("SELECT * FROM employees WHERE id = ? AND deleted_at IS NULL", [$id]);

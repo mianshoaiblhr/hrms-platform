@@ -1,4 +1,4 @@
-<?php $pageTitle='Tasks - Index'; ob_start(); ?>
+<?php // pageTitle='Tasks - Index'; ob_start(); ?>
 <div class="d-flex align-items-center justify-content-between mb-4">
   <div>
     <h4 class="mb-1 fw-bold">Tasks - Index</h4>
@@ -15,4 +15,3 @@
     </a>
   </div>
 </div>
-<?php $content=ob_get_clean(); include ROOT_PATH.'/resources/views/layouts/main.php'; ?>

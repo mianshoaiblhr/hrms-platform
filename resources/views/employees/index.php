@@ -1,4 +1,4 @@
-<?php $pageTitle='Employees'; ob_start(); ?>
+<?php // pageTitle='Employees'; ob_start(); ?>
 <div class="d-flex align-items-center justify-content-between mb-4">
   <div><h4 class="mb-1 fw-bold">Employee Management</h4><p class="text-muted mb-0 small">Manage your workforce</p></div>
   <div class="d-flex gap-2">
@@ -149,4 +149,3 @@ function terminateEmployee(id, name) {
   new bootstrap.Modal(document.getElementById('terminateModal')).show();
 }
 </script>
-<?php $content=ob_get_clean(); include ROOT_PATH.'/resources/views/layouts/main.php'; ?>

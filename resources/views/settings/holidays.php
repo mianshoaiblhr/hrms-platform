@@ -1,4 +1,4 @@
-<?php $pageTitle='Settings - Holidays'; ob_start(); ?>
+<?php // pageTitle='Settings - Holidays'; ob_start(); ?>
 <div class="d-flex align-items-center justify-content-between mb-4">
   <div>
     <h4 class="mb-1 fw-bold">Settings - Holidays</h4>
@@ -15,4 +15,3 @@
     </a>
   </div>
 </div>
-<?php $content=ob_get_clean(); include ROOT_PATH.'/resources/views/layouts/main.php'; ?>
